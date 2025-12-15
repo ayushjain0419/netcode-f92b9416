@@ -1,10 +1,25 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  "https://netcode.lovable.app",
+  "https://tlfrnykndmgiwurclnlg.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const isAllowed = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith(".lovable.app")
+  );
+  
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin! : ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
 
 interface FetchOtpRequest {
   access_code: string;
@@ -72,8 +87,8 @@ async function getAccessToken(): Promise<string> {
 
   if (!response.ok) {
     const error = await response.text();
-    console.error("Failed to refresh access token:", error);
-    throw new Error("Failed to authenticate with Gmail API");
+    console.error("[INTERNAL] Failed to refresh access token:", error);
+    throw new Error("Email service unavailable");
   }
 
   const data = await response.json();
@@ -87,7 +102,7 @@ interface EmailResult {
 
 // Search for Netflix emails and extract the verification link or OTP
 async function fetchNetflixVerification(accessToken: string, gmailAddress: string): Promise<EmailResult> {
-  console.log(`Searching for Netflix verification emails in ${gmailAddress}`);
+  console.log(`[INTERNAL] Searching for Netflix verification emails in ${gmailAddress}`);
 
   // Search for recent Netflix emails about household/verification/temporary access
   const searchQuery = encodeURIComponent(
@@ -105,14 +120,14 @@ async function fetchNetflixVerification(accessToken: string, gmailAddress: strin
 
   if (!searchResponse.ok) {
     const error = await searchResponse.text();
-    console.error("Gmail search failed:", error);
-    throw new Error("Failed to search Gmail");
+    console.error("[INTERNAL] Gmail search failed:", error);
+    throw new Error("Email search failed");
   }
 
   const searchData = await searchResponse.json();
   const messages = searchData.messages || [];
 
-  console.log(`Found ${messages.length} potential Netflix emails`);
+  console.log(`[INTERNAL] Found ${messages.length} potential Netflix emails`);
 
   if (messages.length === 0) {
     return { verification_link: null, otp_code: null };
@@ -130,7 +145,7 @@ async function fetchNetflixVerification(accessToken: string, gmailAddress: strin
   );
 
   if (!messageResponse.ok) {
-    console.error("Failed to fetch message content");
+    console.error("[INTERNAL] Failed to fetch message content");
     return { verification_link: null, otp_code: null };
   }
 
@@ -164,10 +179,9 @@ async function fetchNetflixVerification(accessToken: string, gmailAddress: strin
     }
   }
 
-  console.log("Searching for verification link in email...");
+  console.log("[INTERNAL] Searching for verification link in email...");
 
   // Look for Netflix verification/household/temporary access links
-  // These typically look like: https://www.netflix.com/account/travel/verify?...
   const linkPatterns = [
     /https:\/\/www\.netflix\.com\/account\/travel\/verify[^\s"'<>]+/gi,
     /https:\/\/www\.netflix\.com\/account\/household[^\s"'<>]+/gi,
@@ -179,11 +193,9 @@ async function fetchNetflixVerification(accessToken: string, gmailAddress: strin
   for (const pattern of linkPatterns) {
     const matches = bodyToSearch.match(pattern);
     if (matches && matches.length > 0) {
-      // Clean up the link (remove any trailing quotes, brackets, etc.)
       let link = matches[0].replace(/[&]amp;/g, "&");
-      // Remove HTML entities at the end
       link = link.replace(/&[a-z]+;$/i, "");
-      console.log("Found verification link:", link);
+      console.log("[INTERNAL] Found verification link");
       return { verification_link: link, otp_code: null };
     }
   }
@@ -194,14 +206,14 @@ async function fetchNetflixVerification(accessToken: string, gmailAddress: strin
     for (const link of genericNetflixLink) {
       if (link.includes("travel") || link.includes("verify") || link.includes("code") || link.includes("access")) {
         const cleanLink = link.replace(/[&]amp;/g, "&").replace(/&[a-z]+;$/i, "");
-        console.log("Found Netflix verification link:", cleanLink);
+        console.log("[INTERNAL] Found Netflix verification link");
         return { verification_link: cleanLink, otp_code: null };
       }
     }
   }
 
-  // Also try to extract OTP code as fallback (for simpler verification emails)
-  console.log("No link found, searching for OTP code...");
+  // Also try to extract OTP code as fallback
+  console.log("[INTERNAL] No link found, searching for OTP code...");
   const otpPatterns = [
     /(?:code|verification|verify)[:\s]*(\d{4,6})/i,
     /(\d{4,6})\s*(?:is your|verification|code)/i,
@@ -213,17 +225,20 @@ async function fetchNetflixVerification(accessToken: string, gmailAddress: strin
     if (match) {
       const code = match[1] || match[0];
       if (/^\d{4,6}$/.test(code)) {
-        console.log("Found OTP code:", code);
+        console.log("[INTERNAL] Found OTP code");
         return { verification_link: null, otp_code: code };
       }
     }
   }
 
-  console.log("No verification link or OTP found in email");
+  console.log("[INTERNAL] No verification link or OTP found in email");
   return { verification_link: null, otp_code: null };
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -233,7 +248,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   // Check rate limit before processing
   if (isRateLimited(clientIP)) {
-    console.warn(`Rate limited OTP fetch attempt from IP: ${clientIP}`);
+    console.warn(`[SECURITY] Rate limited OTP fetch attempt from IP: ${clientIP}`);
     return new Response(
       JSON.stringify({ error: "Too many requests. Please try again later." }),
       { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -251,7 +266,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Validating access code and fetching customer data...`);
+    console.log(`[INTERNAL] Validating access code and fetching customer data...`);
 
     // Validate access code and get customer/netflix account data using secure RPC
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -264,9 +279,9 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     if (customerError) {
-      console.error("Error validating access code:", customerError);
+      console.error("[INTERNAL] Error validating access code:", customerError);
       return new Response(
-        JSON.stringify({ error: "Failed to validate access code" }),
+        JSON.stringify({ error: "Service temporarily unavailable" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -274,7 +289,7 @@ const handler = async (req: Request): Promise<Response> => {
     const customer = Array.isArray(customerData) ? customerData[0] : customerData;
 
     if (!customer) {
-      console.log("Invalid or inactive access code");
+      console.log("[INTERNAL] Invalid or inactive access code");
       return new Response(
         JSON.stringify({ error: "Invalid or inactive access code" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -291,7 +306,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Fetching verification for Netflix account ${netflix_account_id} from ${gmail_address}`);
+    console.log(`[INTERNAL] Fetching verification for account`);
 
     // Get fresh access token
     const accessToken = await getAccessToken();
@@ -322,11 +337,11 @@ const handler = async (req: Request): Promise<Response> => {
         netflix_account_id,
         otp_code: result.verification_link || result.otp_code || "",
         fetched_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes (link expiry)
+        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       });
 
     if (insertError) {
-      console.error("Error storing verification:", insertError);
+      console.error("[INTERNAL] Error storing verification:", insertError);
     }
 
     return new Response(
@@ -341,10 +356,10 @@ const handler = async (req: Request): Promise<Response> => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error: any) {
-    console.error("Error in fetch-netflix-otp function:", error);
+  } catch (error: unknown) {
+    console.error("[INTERNAL] Error in fetch-netflix-otp function:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to fetch verification" }),
+      JSON.stringify({ error: "Failed to fetch verification. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

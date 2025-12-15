@@ -6,13 +6,27 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  "https://netcode.lovable.app",
+  "https://tlfrnykndmgiwurclnlg.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const isAllowed = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith(".lovable.app")
+  );
+  
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin! : ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
 
 // In-memory rate limiting store
-// In production with multiple instances, use Redis or similar
 const rateLimits = new Map<string, { attempts: number; resetAt: number }>();
 
 // Rate limiting configuration
@@ -71,6 +85,9 @@ function checkRateLimit(clientIP: string): { allowed: boolean; remaining: number
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -87,7 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
     
     if (!rateCheck.allowed) {
       const retryAfterSeconds = Math.ceil(rateCheck.resetIn / 1000);
-      console.warn(`Rate limited access code attempt from IP: ${clientIP}`);
+      console.warn(`[SECURITY] Rate limited access code attempt from IP: ${clientIP}`);
       return new Response(
         JSON.stringify({ 
           error: "Too many attempts. Please try again later.",
@@ -115,7 +132,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Access code validation attempt from IP: ${clientIP}, remaining attempts: ${rateCheck.remaining}`);
+    console.log(`[INTERNAL] Access code validation attempt from IP: ${clientIP}, remaining attempts: ${rateCheck.remaining}`);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -128,9 +145,9 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (error) {
-      console.error("Error validating access code:", error);
+      console.error("[INTERNAL] Error validating access code:", error);
       return new Response(
-        JSON.stringify({ error: "Failed to validate access code" }),
+        JSON.stringify({ error: "Service temporarily unavailable" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -146,7 +163,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Successful validation - return customer data
-    console.log(`Successful access code validation for customer: ${customerData.id} from IP: ${clientIP}`);
+    console.log(`[INTERNAL] Successful access code validation for customer: ${customerData.id}`);
 
     return new Response(
       JSON.stringify({ 
@@ -158,9 +175,9 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
   } catch (error: unknown) {
-    console.error(`Error in validate-access-code from IP ${clientIP}:`, error);
+    console.error(`[INTERNAL] Error in validate-access-code:`, error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: "Service temporarily unavailable" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

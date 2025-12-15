@@ -1,10 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  "https://netcode.lovable.app",
+  "https://tlfrnykndmgiwurclnlg.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const isAllowed = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith(".lovable.app")
+  );
+  
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin! : ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
 
 // Setup key from environment variable - must be configured in Lovable Cloud secrets
 const SETUP_KEY = Deno.env.get("ADMIN_SETUP_KEY");
@@ -47,6 +62,9 @@ function isRateLimited(clientIP: string): boolean {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -56,7 +74,7 @@ serve(async (req) => {
   try {
     // Security: Check rate limit before any processing
     if (isRateLimited(clientIP)) {
-      console.warn(`Rate limited admin creation attempt from IP: ${clientIP}`);
+      console.warn(`[SECURITY] Rate limited admin creation attempt from IP: ${clientIP}`);
       return new Response(
         JSON.stringify({ error: "Too many attempts. Please try again later." }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -65,21 +83,21 @@ serve(async (req) => {
 
     // Validate setup key is configured
     if (!SETUP_KEY) {
-      console.error("ADMIN_SETUP_KEY environment variable not configured");
+      console.error("[INTERNAL] ADMIN_SETUP_KEY environment variable not configured");
       return new Response(
-        JSON.stringify({ error: "Admin setup not configured" }),
+        JSON.stringify({ error: "Admin setup not available" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const { email, password, name, setupKey } = await req.json();
 
-    // Security: Audit log all admin creation attempts
-    console.log(`Admin creation attempt - IP: ${clientIP}, Email: ${email || "not provided"}`);
+    // Security: Audit log all admin creation attempts (no sensitive data in logs)
+    console.log(`[SECURITY] Admin creation attempt - IP: ${clientIP}`);
 
     // Validate setup key for security
     if (!setupKey || setupKey !== SETUP_KEY) {
-      console.warn(`Invalid setup key attempt from IP: ${clientIP}`);
+      console.warn(`[SECURITY] Invalid setup key attempt from IP: ${clientIP}`);
       return new Response(
         JSON.stringify({ error: "Invalid setup key" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -125,9 +143,20 @@ serve(async (req) => {
     });
 
     if (createError) {
-      console.error(`Error creating admin user for ${email}:`, createError);
+      console.error(`[INTERNAL] Error creating admin user:`, createError);
+      
+      // Map known errors to safe user messages
+      let userMessage = "Failed to create admin account";
+      if (createError.message.includes("already") || createError.message.includes("exists")) {
+        userMessage = "Email already registered";
+      } else if (createError.message.includes("password")) {
+        userMessage = "Password does not meet requirements";
+      } else if (createError.message.includes("email")) {
+        userMessage = "Invalid email address";
+      }
+      
       return new Response(
-        JSON.stringify({ error: createError.message }),
+        JSON.stringify({ error: userMessage }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -138,25 +167,25 @@ serve(async (req) => {
       .insert({ id: userData.user.id, email: userData.user.email });
 
     if (insertError) {
-      console.error(`Error adding admin record for ${email}:`, insertError);
+      console.error(`[INTERNAL] Error adding admin record:`, insertError);
       // Clean up - delete the auth user if admin insert fails
       await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
       return new Response(
-        JSON.stringify({ error: "Failed to create admin record" }),
+        JSON.stringify({ error: "Failed to complete admin setup" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Successfully created admin user: ${email} from IP: ${clientIP}`);
+    console.log(`[SECURITY] Successfully created admin user from IP: ${clientIP}`);
 
     return new Response(
       JSON.stringify({ success: true, user: { id: userData.user.id, email: userData.user.email } }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error(`Unexpected error from IP ${clientIP}:`, error);
+    console.error(`[INTERNAL] Unexpected error:`, error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: "Service temporarily unavailable" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

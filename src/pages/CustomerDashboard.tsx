@@ -38,6 +38,7 @@ const CustomerDashboard = () => {
   const [customer, setCustomer] = useState<CustomerData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [verificationLink, setVerificationLink] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState<string | null>(null);
   const [isFetchingOtp, setIsFetchingOtp] = useState(false);
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ const CustomerDashboard = () => {
     toast.success(`${label} copied to clipboard`);
   };
 
-  const fetchHouseholdOtp = async () => {
+  const fetchHouseholdVerification = async () => {
     if (!customer?.netflix_accounts?.id) {
       toast.error("No Netflix account linked");
       return;
@@ -97,34 +98,15 @@ const CustomerDashboard = () => {
     const gmailAddress = customer.netflix_accounts.gmail_address;
     
     if (!gmailAddress) {
-      // If no Gmail linked, check for cached OTP only
-      try {
-        const { data: otpData } = await supabase
-          .from("otp_logs")
-          .select("otp_code")
-          .eq("netflix_account_id", customer.netflix_accounts.id)
-          .gt("expires_at", new Date().toISOString())
-          .order("fetched_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (otpData) {
-          setOtpCode(otpData.otp_code);
-          toast.success("Household code retrieved successfully");
-        } else {
-          toast.info("No Gmail linked to this account. Contact your admin for the verification code.");
-        }
-      } catch (error) {
-        console.error("Error checking cached OTP:", error);
-        toast.error("Failed to fetch household code");
-      }
+      toast.info("No Gmail linked to this account. Contact your admin for the verification link.");
       return;
     }
 
     setIsFetchingOtp(true);
+    setVerificationLink(null);
+    setOtpCode(null);
     
     try {
-      // First, try to fetch fresh OTP from Gmail via edge function
       const { data: functionData, error: functionError } = await supabase.functions.invoke(
         "fetch-netflix-otp",
         {
@@ -137,35 +119,24 @@ const CustomerDashboard = () => {
 
       if (functionError) {
         console.error("Edge function error:", functionError);
-        // Fall back to cached OTP
-        const { data: otpData } = await supabase
-          .from("otp_logs")
-          .select("otp_code")
-          .eq("netflix_account_id", customer.netflix_accounts.id)
-          .gt("expires_at", new Date().toISOString())
-          .order("fetched_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (otpData) {
-          setOtpCode(otpData.otp_code);
-          toast.success("Household code retrieved from cache");
-        } else {
-          toast.error("Could not fetch verification code. Please try again.");
-        }
+        toast.error("Could not fetch verification. Please try again.");
         return;
       }
 
-      if (functionData?.success && functionData?.otp_code) {
-        setOtpCode(functionData.otp_code);
-        toast.success("Household code retrieved successfully");
+      if (functionData?.success) {
+        if (functionData.verification_link) {
+          setVerificationLink(functionData.verification_link);
+          toast.success("Verification link retrieved! Click the button to get your code.");
+        } else if (functionData.otp_code) {
+          setOtpCode(functionData.otp_code);
+          toast.success("Verification code retrieved successfully");
+        }
       } else {
-        toast.info(functionData?.message || "No recent verification code found in email.");
-        setOtpCode(null);
+        toast.info(functionData?.message || "No recent verification email found. Request a code from Netflix first.");
       }
     } catch (error) {
-      console.error("Error fetching OTP:", error);
-      toast.error("Failed to fetch household code");
+      console.error("Error fetching verification:", error);
+      toast.error("Failed to fetch verification");
     } finally {
       setIsFetchingOtp(false);
     }
@@ -356,13 +327,13 @@ const CustomerDashboard = () => {
           <CardContent className="space-y-4">
             <div className="bg-muted/50 rounded-lg p-4">
               <p className="text-sm text-muted-foreground mb-4">
-                If Netflix prompts you to verify your household, click the button below to retrieve the latest verification code. This code is fetched from the account's linked email.
+                If Netflix prompts you to verify your household, click the button below to get your verification link. You'll be redirected to Netflix to get your temporary access code.
               </p>
               
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex flex-col gap-4">
                 <Button 
                   variant="netflix" 
-                  onClick={fetchHouseholdOtp}
+                  onClick={fetchHouseholdVerification}
                   disabled={isFetchingOtp || !customer.netflix_accounts}
                 >
                   {isFetchingOtp ? (
@@ -373,10 +344,29 @@ const CustomerDashboard = () => {
                   ) : (
                     <>
                       <Home className="w-4 h-4" />
-                      Get Household Code
+                      Get Verification Link
                     </>
                   )}
                 </Button>
+
+                {verificationLink && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Click the button below to open Netflix and get your temporary access code:
+                    </p>
+                    <Button
+                      variant="default"
+                      className="w-full sm:w-auto"
+                      onClick={() => window.open(verificationLink, "_blank")}
+                    >
+                      <Tv className="w-4 h-4 mr-2" />
+                      Open Netflix & Get Code
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Link expires in 15 minutes
+                    </p>
+                  </div>
+                )}
 
                 {otpCode && (
                   <div className="flex items-center gap-2">
@@ -396,7 +386,7 @@ const CustomerDashboard = () => {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Note: Verification codes expire after 10 minutes. If the code doesn't work, click the button again to fetch a new one.
+              Note: You must first request a verification from Netflix by trying to log in. The link expires after 15 minutes.
             </p>
           </CardContent>
         </Card>

@@ -7,13 +7,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Mail, Key, Eye, EyeOff } from "lucide-react";
+import { Plus, Edit, Trash2, Mail, Eye, EyeOff, Calendar, CreditCard } from "lucide-react";
 
 interface NetflixAccount {
   id: string;
   netflix_email: string;
   netflix_password: string;
   gmail_address: string | null;
+  account_created_date: string | null;
+  payment_account: string | null;
   created_at: string;
 }
 
@@ -27,7 +29,9 @@ const NetflixAccountsTab = () => {
   const [formData, setFormData] = useState({
     netflix_email: "",
     netflix_password: "",
-    gmail_address: ""
+    gmail_address: "",
+    account_created_date: "",
+    payment_account: ""
   });
 
   useEffect(() => {
@@ -66,7 +70,9 @@ const NetflixAccountsTab = () => {
           .update({
             netflix_email: formData.netflix_email,
             netflix_password: formData.netflix_password,
-            gmail_address: formData.gmail_address || null
+            gmail_address: formData.gmail_address || null,
+            account_created_date: formData.account_created_date || null,
+            payment_account: formData.payment_account || null
           })
           .eq("id", editingAccount.id);
 
@@ -78,7 +84,9 @@ const NetflixAccountsTab = () => {
           .insert({
             netflix_email: formData.netflix_email,
             netflix_password: formData.netflix_password,
-            gmail_address: formData.gmail_address || null
+            gmail_address: formData.gmail_address || null,
+            account_created_date: formData.account_created_date || null,
+            payment_account: formData.payment_account || null
           });
 
         if (error) throw error;
@@ -113,7 +121,7 @@ const NetflixAccountsTab = () => {
   };
 
   const resetForm = () => {
-    setFormData({ netflix_email: "", netflix_password: "", gmail_address: "" });
+    setFormData({ netflix_email: "", netflix_password: "", gmail_address: "", account_created_date: "", payment_account: "" });
     setEditingAccount(null);
   };
 
@@ -122,7 +130,9 @@ const NetflixAccountsTab = () => {
     setFormData({
       netflix_email: account.netflix_email,
       netflix_password: account.netflix_password,
-      gmail_address: account.gmail_address || ""
+      gmail_address: account.gmail_address || "",
+      account_created_date: account.account_created_date || "",
+      payment_account: account.payment_account || ""
     });
     setIsDialogOpen(true);
   };
@@ -191,6 +201,27 @@ const NetflixAccountsTab = () => {
                   Gmail used for Netflix verification emails
                 </p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="account_created_date">Account Created Date (Optional)</Label>
+                <Input
+                  id="account_created_date"
+                  type="date"
+                  value={formData.account_created_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, account_created_date: e.target.value }))}
+                  className="bg-input"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment_account">Payment Account (Optional)</Label>
+                <Input
+                  id="payment_account"
+                  type="text"
+                  placeholder="e.g., PayPal, Card ending 1234"
+                  value={formData.payment_account}
+                  onChange={(e) => setFormData(prev => ({ ...prev, payment_account: e.target.value }))}
+                  className="bg-input"
+                />
+              </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>
                   Cancel
@@ -219,6 +250,8 @@ const NetflixAccountsTab = () => {
                   <TableHead>Netflix Email</TableHead>
                   <TableHead>Password</TableHead>
                   <TableHead>Linked Gmail</TableHead>
+                  <TableHead>Created Date</TableHead>
+                  <TableHead>Payment Account</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -252,6 +285,18 @@ const NetflixAccountsTab = () => {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {account.gmail_address || "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        {account.account_created_date || "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4" />
+                        {account.payment_account || "—"}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

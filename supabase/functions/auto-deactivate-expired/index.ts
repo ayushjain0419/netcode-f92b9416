@@ -1,19 +1,31 @@
 // ============================================
 // AUTO-DEACTIVATE EXPIRED SUBSCRIPTIONS
 // Edge function that runs daily via cron to mark expired subscriptions as inactive
+// SECURITY: This function requires CRON_SECRET authentication
 // ============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 Deno.serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  // This is an internal cron function - no CORS headers needed
+  // Verify this is an authorized cron/internal call
+  const authHeader = req.headers.get("Authorization");
+  const cronSecret = Deno.env.get("CRON_SECRET");
+
+  if (!cronSecret) {
+    console.error("CRON_SECRET environment variable not configured");
+    return new Response(
+      JSON.stringify({ error: "Internal configuration error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    console.warn("Unauthorized cron function access attempt");
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   try {
@@ -24,6 +36,7 @@ Deno.serve(async (req) => {
 
     // Get current date
     const today = new Date().toISOString().split("T")[0];
+    console.log(`Running auto-deactivate check for date: ${today}`);
 
     // Find all active customers whose subscription has expired
     // Subscription expires when: purchase_date + subscription_days <= today
@@ -54,7 +67,7 @@ Deno.serve(async (req) => {
           message: "No expired subscriptions found",
           deactivated_count: 0,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -80,7 +93,7 @@ Deno.serve(async (req) => {
         deactivated_count: customersToDeactivate.length,
         deactivated_customers: customersToDeactivate.map((c) => c.name),
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
     console.error("Error in auto-deactivate function:", error);
@@ -90,7 +103,7 @@ Deno.serve(async (req) => {
         success: false,
         error: errorMessage,
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });

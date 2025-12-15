@@ -10,6 +10,43 @@ interface FetchOtpRequest {
   access_code: string;
 }
 
+// In-memory rate limiting for OTP fetch attempts
+const rateLimits = new Map<string, { attempts: number; resetAt: number }>();
+const MAX_OTP_ATTEMPTS = 10; // Max 10 OTP fetches per 15 minutes per IP
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
+
+function getClientIP(req: Request): string {
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function isRateLimited(clientIP: string): boolean {
+  const now = Date.now();
+  const limit = rateLimits.get(clientIP);
+
+  if (!limit) {
+    rateLimits.set(clientIP, { attempts: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return false;
+  }
+
+  if (now > limit.resetAt) {
+    rateLimits.set(clientIP, { attempts: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return false;
+  }
+
+  if (limit.attempts >= MAX_OTP_ATTEMPTS) {
+    return true;
+  }
+
+  limit.attempts++;
+  rateLimits.set(clientIP, limit);
+  return false;
+}
+
 // Get new access token using refresh token
 async function getAccessToken(): Promise<string> {
   const clientId = Deno.env.get("GMAIL_CLIENT_ID");
@@ -190,6 +227,17 @@ const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const clientIP = getClientIP(req);
+
+  // Check rate limit before processing
+  if (isRateLimited(clientIP)) {
+    console.warn(`Rate limited OTP fetch attempt from IP: ${clientIP}`);
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please try again later." }),
+      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   try {

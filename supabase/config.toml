@@ -1,1 +1,13 @@
 project_id = "tlfrnykndmgiwurclnlg"
+
+[functions.fetch-netflix-otp]
+verify_jwt = false
+
+[functions.auto-deactivate-expired]
+verify_jwt = false
+
+[functions.create-admin-user]
+verify_jwt = false
+
+[functions.validate-access-code]
+verify_jwt = false

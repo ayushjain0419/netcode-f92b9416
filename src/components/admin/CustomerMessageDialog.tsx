@@ -25,6 +25,7 @@ interface CustomerMessageData {
   subscriptionDays: number;
   purchaseDate: string;
   accessCode: string;
+  purchasedFrom: string | null;
 }
 
 interface CustomerMessageDialogProps {
@@ -38,6 +39,7 @@ const generateMessage = (data: CustomerMessageData): string => {
   const profileText = data.profileNumber ? `${data.profileNumber}` : "N/A";
   const validityText = `${data.subscriptionDays} Days`;
   const issueDate = format(new Date(data.purchaseDate), "dd MMM yyyy");
+  const purchasedFromText = data.purchasedFrom ? `\n🏪 | Purchased From - ${data.purchasedFrom}` : "";
   
   return `𝐍𝐄𝐓𝐅𝐋𝐈𝐗 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐀𝐂𝐂𝐎𝐔𝐍𝐓
 
@@ -48,7 +50,7 @@ const generateMessage = (data: CustomerMessageData): string => {
 🛍️ | Plan - Premium
 🍿 | Allowed streams - 1
 ⏳ | Validity - ${validityText}
-📅 | Issue Date - ${issueDate}
+📅 | Issue Date - ${issueDate}${purchasedFromText}
 
 How to login:
 https://drive.google.com/drive/folders/1Yz-94GkWzU_-kN5UzUxWhs5cQ9Jn5bMd

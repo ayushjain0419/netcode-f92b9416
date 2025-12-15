@@ -42,6 +42,7 @@ export type Database = {
           netflix_account_id: string | null
           profile_number: number | null
           purchase_date: string
+          purchased_from: string | null
           subscription_days: number
           updated_at: string
         }
@@ -54,6 +55,7 @@ export type Database = {
           netflix_account_id?: string | null
           profile_number?: number | null
           purchase_date?: string
+          purchased_from?: string | null
           subscription_days?: number
           updated_at?: string
         }
@@ -66,6 +68,7 @@ export type Database = {
           netflix_account_id?: string | null
           profile_number?: number | null
           purchase_date?: string
+          purchased_from?: string | null
           subscription_days?: number
           updated_at?: string
         }

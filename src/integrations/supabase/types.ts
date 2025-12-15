@@ -157,6 +157,30 @@ export type Database = {
         Args: { p_access_code: string }
         Returns: string
       }
+      get_customer_data_by_access_code: {
+        Args: { p_access_code: string }
+        Returns: {
+          access_code: string
+          gmail_address: string
+          id: string
+          is_active: boolean
+          name: string
+          netflix_account_id: string
+          netflix_email: string
+          netflix_password: string
+          profile_number: number
+          purchase_date: string
+          purchased_from: string
+          subscription_days: number
+        }[]
+      }
+      get_otp_by_access_code: {
+        Args: { p_access_code: string }
+        Returns: {
+          expires_at: string
+          otp_code: string
+        }[]
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       verify_access_code: { Args: { p_access_code: string }; Returns: string }
     }

@@ -97,36 +97,51 @@ const CustomerDashboard = () => {
 
   const fetchCustomerData = async (accessCode: string) => {
     try {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("*, netflix_accounts(*)")
-        .eq("access_code", accessCode)
-        .eq("is_active", true)
-        .maybeSingle();
+      // Use secure RPC function that validates access code server-side
+      const { data, error } = await supabase.rpc("get_customer_data_by_access_code", {
+        p_access_code: accessCode,
+      });
 
       if (error) throw error;
 
-      if (!data) {
+      // RPC returns an array, get the first row
+      const customerRow = Array.isArray(data) ? data[0] : data;
+
+      if (!customerRow) {
         sessionStorage.removeItem("customerAccessCode");
         navigate("/");
         return;
       }
 
-      // Check if subscription is expired and auto-deactivate
-      const endDate = addDays(new Date(data.purchase_date), data.subscription_days);
-      const isExpired = differenceInDays(endDate, new Date()) <= 0;
+      // Transform the flat RPC response into the expected nested structure
+      const customerData: CustomerData = {
+        id: customerRow.id,
+        name: customerRow.name,
+        access_code: customerRow.access_code,
+        purchase_date: customerRow.purchase_date,
+        subscription_days: customerRow.subscription_days,
+        is_active: customerRow.is_active,
+        profile_number: customerRow.profile_number,
+        purchased_from: customerRow.purchased_from,
+        netflix_accounts: customerRow.netflix_account_id
+          ? {
+              id: customerRow.netflix_account_id,
+              netflix_email: customerRow.netflix_email,
+              netflix_password: customerRow.netflix_password,
+              gmail_address: customerRow.gmail_address,
+            }
+          : null,
+      };
 
-      if (isExpired) {
-        // Auto-deactivate expired subscription on login
-        await supabase
-          .from("customers")
-          .update({ is_active: false })
-          .eq("id", data.id);
-        
-        // Set customer data but mark as expired for display
-        setCustomer({ ...data, is_active: false });
+      // Check if subscription is expired and auto-deactivate
+      const endDate = addDays(new Date(customerData.purchase_date), customerData.subscription_days);
+      const isExpiredCheck = differenceInDays(endDate, new Date()) <= 0;
+
+      if (isExpiredCheck) {
+        // Mark as expired for display (the server won't return this if deactivated)
+        setCustomer({ ...customerData, is_active: false });
       } else {
-        setCustomer(data);
+        setCustomer(customerData);
       }
     } catch (error) {
       console.error("Error fetching customer data:", error);

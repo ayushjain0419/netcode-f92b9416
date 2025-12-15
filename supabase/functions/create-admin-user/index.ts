@@ -6,8 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// One-time setup key - change or remove after use
-const SETUP_KEY = "netcode-setup-2024";
+// Setup key from environment variable - must be configured in Lovable Cloud secrets
+const SETUP_KEY = Deno.env.get("ADMIN_SETUP_KEY");
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,10 +15,19 @@ serve(async (req) => {
   }
 
   try {
+    // Validate setup key is configured
+    if (!SETUP_KEY) {
+      console.error("ADMIN_SETUP_KEY environment variable not configured");
+      return new Response(
+        JSON.stringify({ error: "Admin setup not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { email, password, name, setupKey } = await req.json();
 
     // Validate setup key for security
-    if (setupKey !== SETUP_KEY) {
+    if (!setupKey || setupKey !== SETUP_KEY) {
       return new Response(
         JSON.stringify({ error: "Invalid setup key" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -23,16 +23,16 @@ const Index = () => {
     setIsLoading(true);
     
     try {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("*, netflix_accounts(*)")
-        .eq("access_code", accessCode)
-        .eq("is_active", true)
-        .maybeSingle();
+      // Use secure RPC function with server-side validation
+      const { data, error } = await supabase.rpc("get_customer_data_by_access_code", {
+        p_access_code: accessCode,
+      });
 
       if (error) throw error;
 
-      if (!data) {
+      const customerData = Array.isArray(data) ? data[0] : data;
+      
+      if (!customerData) {
         toast.error("Invalid or inactive access code");
         return;
       }

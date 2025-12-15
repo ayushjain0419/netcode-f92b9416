@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+// ============================================
+// CUSTOMER DASHBOARD
+// Displays customer's Netflix account details, subscription status,
+// and household verification functionality
+// ============================================
+
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +22,15 @@ import {
   Eye, 
   EyeOff,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  User
 } from "lucide-react";
 import { format, differenceInDays, addDays } from "date-fns";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
+
+// ============================================
+// INTERFACES
+// ============================================
 
 interface CustomerData {
   id: string;
@@ -26,6 +38,8 @@ interface CustomerData {
   access_code: string;
   purchase_date: string;
   subscription_days: number;
+  is_active: boolean;
+  profile_number: number | null;
   netflix_accounts: {
     id: string;
     netflix_email: string;
@@ -33,6 +47,13 @@ interface CustomerData {
     gmail_address: string | null;
   } | null;
 }
+
+// Inactivity timeout in minutes for customer sessions
+const INACTIVITY_TIMEOUT_MINUTES = 15;
+
+// ============================================
+// COMPONENT
+// ============================================
 
 const CustomerDashboard = () => {
   const [customer, setCustomer] = useState<CustomerData | null>(null);
@@ -42,6 +63,26 @@ const CustomerDashboard = () => {
   const [otpCode, setOtpCode] = useState<string | null>(null);
   const [isFetchingOtp, setIsFetchingOtp] = useState(false);
   const navigate = useNavigate();
+
+  // ============================================
+  // LOGOUT & INACTIVITY TIMEOUT
+  // ============================================
+
+  const handleLogout = useCallback(() => {
+    sessionStorage.removeItem("customerAccessCode");
+    navigate("/");
+  }, [navigate]);
+
+  // Auto-logout after inactivity
+  useInactivityTimeout({
+    timeoutMinutes: INACTIVITY_TIMEOUT_MINUTES,
+    onTimeout: handleLogout,
+    enabled: true,
+  });
+
+  // ============================================
+  // DATA FETCHING & SUBSCRIPTION CHECK
+  // ============================================
 
   useEffect(() => {
     const accessCode = sessionStorage.getItem("customerAccessCode");
@@ -70,7 +111,22 @@ const CustomerDashboard = () => {
         return;
       }
 
-      setCustomer(data);
+      // Check if subscription is expired and auto-deactivate
+      const endDate = addDays(new Date(data.purchase_date), data.subscription_days);
+      const isExpired = differenceInDays(endDate, new Date()) <= 0;
+
+      if (isExpired) {
+        // Auto-deactivate expired subscription on login
+        await supabase
+          .from("customers")
+          .update({ is_active: false })
+          .eq("id", data.id);
+        
+        // Set customer data but mark as expired for display
+        setCustomer({ ...data, is_active: false });
+      } else {
+        setCustomer(data);
+      }
     } catch (error) {
       console.error("Error fetching customer data:", error);
       toast.error("Failed to load account details");
@@ -79,10 +135,9 @@ const CustomerDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("customerAccessCode");
-    navigate("/");
-  };
+  // ============================================
+  // HELPER FUNCTIONS
+  // ============================================
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -142,6 +197,10 @@ const CustomerDashboard = () => {
     }
   };
 
+  // ============================================
+  // LOADING & EMPTY STATES
+  // ============================================
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -152,10 +211,18 @@ const CustomerDashboard = () => {
 
   if (!customer) return null;
 
+  // ============================================
+  // COMPUTED VALUES
+  // ============================================
+
   const endDate = addDays(new Date(customer.purchase_date), customer.subscription_days);
   const daysRemaining = differenceInDays(endDate, new Date());
   const isExpiringSoon = daysRemaining <= 7 && daysRemaining > 0;
-  const isExpired = daysRemaining <= 0;
+  const isExpired = daysRemaining <= 0 || !customer.is_active;
+
+  // ============================================
+  // RENDER
+  // ============================================
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,13 +247,18 @@ const CustomerDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-        {/* Status Banner */}
+        {/* Status Banner - Expired Subscription */}
         {isExpired ? (
           <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-            <p className="text-destructive text-sm">
-              Your subscription has expired. Please contact your provider to renew.
-            </p>
+            <div>
+              <p className="text-destructive text-sm font-medium">
+                Subscription Expired
+              </p>
+              <p className="text-destructive/80 text-xs">
+                Your subscription has expired. Please contact your provider to renew.
+              </p>
+            </div>
           </div>
         ) : isExpiringSoon ? (
           <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-center gap-3">
@@ -208,7 +280,13 @@ const CustomerDashboard = () => {
               <CardDescription>Your Netflix account credentials</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {customer.netflix_accounts ? (
+              {/* Show expired message if subscription expired */}
+              {isExpired ? (
+                <div className="text-muted-foreground text-sm p-4 bg-muted/50 rounded-lg">
+                  <p className="font-medium text-foreground mb-1">Access Restricted</p>
+                  <p>Your subscription has expired. Netflix credentials are hidden until you renew.</p>
+                </div>
+              ) : customer.netflix_accounts ? (
                 <>
                   {/* Email */}
                   <div className="space-y-2">
@@ -256,6 +334,19 @@ const CustomerDashboard = () => {
                       </Button>
                     </div>
                   </div>
+
+                  {/* Profile Number */}
+                  {customer.profile_number && (
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                        <User className="w-3 h-3" />
+                        Profile Number
+                      </label>
+                      <div className="bg-input px-3 py-2 rounded-md text-sm font-medium">
+                        Profile {customer.profile_number}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="text-muted-foreground text-sm">No Netflix account assigned yet.</p>
@@ -313,83 +404,85 @@ const CustomerDashboard = () => {
           </Card>
         </div>
 
-        {/* Household Verification Card */}
-        <Card className="glass animate-slide-up" style={{ animationDelay: "0.2s" }}>
-          <CardHeader>
-            <CardTitle className="font-display text-2xl tracking-wide flex items-center gap-2">
-              <Home className="w-5 h-5 text-primary" />
-              Household Verification
-            </CardTitle>
-            <CardDescription>
-              Use only if Netflix asks for household verification when logging in
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted/50 rounded-lg p-4">
-              <p className="text-sm text-muted-foreground mb-4">
-                If Netflix prompts you to verify your household, click the button below to get your verification link. You'll be redirected to Netflix to get your temporary access code.
-              </p>
-              
-              <div className="flex flex-col gap-4">
-                <Button 
-                  variant="netflix" 
-                  onClick={fetchHouseholdVerification}
-                  disabled={isFetchingOtp || !customer.netflix_accounts}
-                >
-                  {isFetchingOtp ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Fetching...
-                    </>
-                  ) : (
-                    <>
-                      <Home className="w-4 h-4" />
-                      Get Verification Link
-                    </>
+        {/* Household Verification Card - Only show if not expired */}
+        {!isExpired && (
+          <Card className="glass animate-slide-up" style={{ animationDelay: "0.2s" }}>
+            <CardHeader>
+              <CardTitle className="font-display text-2xl tracking-wide flex items-center gap-2">
+                <Home className="w-5 h-5 text-primary" />
+                Household Verification
+              </CardTitle>
+              <CardDescription>
+                Use only if Netflix asks for household verification when logging in
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground mb-4">
+                  If Netflix prompts you to verify your household, click the button below to get your verification link. You'll be redirected to Netflix to get your temporary access code.
+                </p>
+                
+                <div className="flex flex-col gap-4">
+                  <Button 
+                    variant="netflix" 
+                    onClick={fetchHouseholdVerification}
+                    disabled={isFetchingOtp || !customer.netflix_accounts}
+                  >
+                    {isFetchingOtp ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <Home className="w-4 h-4" />
+                        Get Verification Link
+                      </>
+                    )}
+                  </Button>
+
+                  {verificationLink && (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Click the button below to open Netflix and get your temporary access code:
+                      </p>
+                      <Button
+                        variant="default"
+                        className="w-full sm:w-auto"
+                        onClick={() => window.open(verificationLink, "_blank")}
+                      >
+                        <Tv className="w-4 h-4 mr-2" />
+                        Open Netflix & Get Code
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Link expires in 15 minutes
+                      </p>
+                    </div>
                   )}
-                </Button>
 
-                {verificationLink && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Click the button below to open Netflix and get your temporary access code:
-                    </p>
-                    <Button
-                      variant="default"
-                      className="w-full sm:w-auto"
-                      onClick={() => window.open(verificationLink, "_blank")}
-                    >
-                      <Tv className="w-4 h-4 mr-2" />
-                      Open Netflix & Get Code
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Link expires in 15 minutes
-                    </p>
-                  </div>
-                )}
-
-                {otpCode && (
-                  <div className="flex items-center gap-2">
-                    <code className="bg-primary/10 border border-primary/30 text-primary px-4 py-2 rounded-lg text-2xl font-mono tracking-widest">
-                      {otpCode}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => copyToClipboard(otpCode, "OTP code")}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
+                  {otpCode && (
+                    <div className="flex items-center gap-2">
+                      <code className="bg-primary/10 border border-primary/30 text-primary px-4 py-2 rounded-lg text-2xl font-mono tracking-widest">
+                        {otpCode}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(otpCode, "OTP code")}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <p className="text-xs text-muted-foreground">
-              Note: You must first request a verification from Netflix by trying to log in. The link expires after 15 minutes.
-            </p>
-          </CardContent>
-        </Card>
+              <p className="text-xs text-muted-foreground">
+                Note: You must first request a verification from Netflix by trying to log in. The link expires after 15 minutes.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

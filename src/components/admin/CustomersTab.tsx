@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react";
+// ============================================
+// CUSTOMERS TAB - Admin Panel
+// Manages customer list with search, filters, and CRUD operations
+// ============================================
+
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,10 +16,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, Copy, RefreshCw, User } from "lucide-react";
 import { format, differenceInDays, addDays } from "date-fns";
+import CustomerFilters from "./CustomerFilters";
+import CustomerMessageDialog from "./CustomerMessageDialog";
+
+// ============================================
+// INTERFACES
+// ============================================
 
 interface NetflixAccount {
   id: string;
   netflix_email: string;
+  netflix_password: string;
 }
 
 interface Customer {
@@ -25,22 +37,49 @@ interface Customer {
   purchase_date: string;
   subscription_days: number;
   is_active: boolean;
+  profile_number: number | null;
   netflix_accounts: NetflixAccount | null;
 }
 
+interface CustomerMessageData {
+  customerName: string;
+  netflixEmail: string;
+  netflixPassword: string;
+  profileNumber: number | null;
+  subscriptionDays: number;
+  purchaseDate: string;
+  accessCode: string;
+}
+
+// ============================================
+// COMPONENT
+// ============================================
+
 const CustomersTab = () => {
+  // State for customers and accounts
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [accounts, setAccounts] = useState<NetflixAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [profileFilter, setProfileFilter] = useState("all");
+
+  // Auto-copy message dialog state
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [newCustomerData, setNewCustomerData] = useState<CustomerMessageData | null>(null);
+  
+  // Form data with profile_number field
   const [formData, setFormData] = useState({
     name: "",
     netflix_account_id: "",
     purchase_date: format(new Date(), "yyyy-MM-dd"),
     subscription_days: "30",
-    is_active: true
+    is_active: true,
+    profile_number: "" // 1-5 or empty
   });
 
   useEffect(() => {
@@ -48,11 +87,15 @@ const CustomersTab = () => {
     fetchAccounts();
   }, []);
 
+  // ============================================
+  // DATA FETCHING
+  // ============================================
+
   const fetchCustomers = async () => {
     try {
       const { data, error } = await supabase
         .from("customers")
-        .select("*, netflix_accounts(id, netflix_email)")
+        .select("*, netflix_accounts(id, netflix_email, netflix_password)")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -69,7 +112,7 @@ const CustomersTab = () => {
     try {
       const { data, error } = await supabase
         .from("netflix_accounts")
-        .select("id, netflix_email");
+        .select("id, netflix_email, netflix_password");
 
       if (error) throw error;
       setAccounts(data || []);
@@ -78,9 +121,62 @@ const CustomersTab = () => {
     }
   };
 
+  // ============================================
+  // HELPER FUNCTIONS
+  // ============================================
+
   const generateAccessCode = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
+
+  // Get customer status based on dates and is_active flag
+  const getStatus = (customer: Customer) => {
+    const endDate = addDays(new Date(customer.purchase_date), customer.subscription_days);
+    const daysRemaining = differenceInDays(endDate, new Date());
+    
+    if (!customer.is_active) {
+      return { label: "Inactive", variant: "secondary" as const, status: "inactive" };
+    }
+    if (daysRemaining <= 0) {
+      return { label: "Expired", variant: "destructive" as const, status: "expired" };
+    }
+    if (daysRemaining <= 7) {
+      return { label: `${daysRemaining}d left`, variant: "outline" as const, status: "active" };
+    }
+    return { label: "Active", variant: "default" as const, status: "active" };
+  };
+
+  // ============================================
+  // FILTERING LOGIC
+  // ============================================
+
+  const filteredCustomers = useMemo(() => {
+    return customers.filter((customer) => {
+      // Search filter - check name and netflix email
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        searchTerm === "" ||
+        customer.name.toLowerCase().includes(searchLower) ||
+        (customer.netflix_accounts?.netflix_email?.toLowerCase().includes(searchLower) ?? false);
+
+      // Status filter
+      const status = getStatus(customer);
+      const matchesStatus = 
+        statusFilter === "all" || status.status === statusFilter;
+
+      // Profile filter
+      const matchesProfile = 
+        profileFilter === "all" ||
+        (profileFilter === "none" && customer.profile_number === null) ||
+        (customer.profile_number?.toString() === profileFilter);
+
+      return matchesSearch && matchesStatus && matchesProfile;
+    });
+  }, [customers, searchTerm, statusFilter, profileFilter]);
+
+  // ============================================
+  // CRUD OPERATIONS
+  // ============================================
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +188,7 @@ const CustomersTab = () => {
 
     try {
       if (editingCustomer) {
+        // Update existing customer
         const { error } = await supabase
           .from("customers")
           .update({
@@ -99,14 +196,18 @@ const CustomersTab = () => {
             netflix_account_id: formData.netflix_account_id || null,
             purchase_date: formData.purchase_date,
             subscription_days: parseInt(formData.subscription_days),
-            is_active: formData.is_active
+            is_active: formData.is_active,
+            profile_number: formData.profile_number ? parseInt(formData.profile_number) : null
           })
           .eq("id", editingCustomer.id);
 
         if (error) throw error;
         toast.success("Customer updated successfully");
+        setIsDialogOpen(false);
       } else {
+        // Create new customer
         const accessCode = generateAccessCode();
+        const selectedAccount = accounts.find(a => a.id === formData.netflix_account_id);
         
         const { error } = await supabase
           .from("customers")
@@ -116,14 +217,28 @@ const CustomersTab = () => {
             netflix_account_id: formData.netflix_account_id || null,
             purchase_date: formData.purchase_date,
             subscription_days: parseInt(formData.subscription_days),
-            is_active: formData.is_active
+            is_active: formData.is_active,
+            profile_number: formData.profile_number ? parseInt(formData.profile_number) : null
           });
 
         if (error) throw error;
+        
+        // Prepare data for message dialog
+        setNewCustomerData({
+          customerName: formData.name,
+          netflixEmail: selectedAccount?.netflix_email || "N/A",
+          netflixPassword: selectedAccount?.netflix_password || "N/A",
+          profileNumber: formData.profile_number ? parseInt(formData.profile_number) : null,
+          subscriptionDays: parseInt(formData.subscription_days),
+          purchaseDate: formData.purchase_date,
+          accessCode: accessCode
+        });
+        
+        setIsDialogOpen(false);
+        setMessageDialogOpen(true); // Show auto-copy message dialog
         toast.success(`Customer created! Access code: ${accessCode}`);
       }
 
-      setIsDialogOpen(false);
       resetForm();
       fetchCustomers();
     } catch (error: any) {
@@ -173,13 +288,18 @@ const CustomersTab = () => {
     toast.success("Access code copied to clipboard");
   };
 
+  // ============================================
+  // FORM HELPERS
+  // ============================================
+
   const resetForm = () => {
     setFormData({
       name: "",
       netflix_account_id: "",
       purchase_date: format(new Date(), "yyyy-MM-dd"),
       subscription_days: "30",
-      is_active: true
+      is_active: true,
+      profile_number: ""
     });
     setEditingCustomer(null);
   };
@@ -191,29 +311,19 @@ const CustomersTab = () => {
       netflix_account_id: customer.netflix_account_id || "",
       purchase_date: customer.purchase_date,
       subscription_days: customer.subscription_days.toString(),
-      is_active: customer.is_active
+      is_active: customer.is_active,
+      profile_number: customer.profile_number?.toString() || ""
     });
     setIsDialogOpen(true);
   };
 
-  const getStatus = (customer: Customer) => {
-    const endDate = addDays(new Date(customer.purchase_date), customer.subscription_days);
-    const daysRemaining = differenceInDays(endDate, new Date());
-    
-    if (!customer.is_active) {
-      return { label: "Inactive", variant: "secondary" as const };
-    }
-    if (daysRemaining <= 0) {
-      return { label: "Expired", variant: "destructive" as const };
-    }
-    if (daysRemaining <= 7) {
-      return { label: `${daysRemaining}d left`, variant: "outline" as const };
-    }
-    return { label: "Active", variant: "default" as const };
-  };
+  // ============================================
+  // RENDER
+  // ============================================
 
   return (
     <div className="space-y-6">
+      {/* Header with Add Button */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="font-display text-3xl tracking-wide text-foreground">Customers</h2>
@@ -236,6 +346,7 @@ const CustomersTab = () => {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Customer Name */}
               <div className="space-y-2">
                 <Label htmlFor="name">Customer Name</Label>
                 <Input
@@ -247,6 +358,7 @@ const CustomersTab = () => {
                 />
               </div>
               
+              {/* Netflix Account Selection */}
               <div className="space-y-2">
                 <Label htmlFor="netflix_account">Assign Netflix Account</Label>
                 <Select
@@ -267,6 +379,28 @@ const CustomersTab = () => {
                 </Select>
               </div>
 
+              {/* Profile Number Selection (1-5) */}
+              <div className="space-y-2">
+                <Label htmlFor="profile_number">Profile Number</Label>
+                <Select
+                  value={formData.profile_number || "none"}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, profile_number: value === "none" ? "" : value }))}
+                >
+                  <SelectTrigger className="bg-input">
+                    <SelectValue placeholder="Select profile number" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="1">Profile 1</SelectItem>
+                    <SelectItem value="2">Profile 2</SelectItem>
+                    <SelectItem value="3">Profile 3</SelectItem>
+                    <SelectItem value="4">Profile 4</SelectItem>
+                    <SelectItem value="5">Profile 5</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date and Duration */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="purchase_date">Purchase Date</Label>
@@ -291,6 +425,7 @@ const CustomersTab = () => {
                 </div>
               </div>
 
+              {/* Active Checkbox */}
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -315,13 +450,26 @@ const CustomersTab = () => {
         </Dialog>
       </div>
 
+      {/* Search and Filters */}
+      <CustomerFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        profileFilter={profileFilter}
+        onProfileFilterChange={setProfileFilter}
+      />
+
+      {/* Customers Table */}
       <Card className="glass">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-8 text-center text-muted-foreground">Loading customers...</div>
-          ) : customers.length === 0 ? (
+          ) : filteredCustomers.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              No customers yet. Click "Add Customer" to create one.
+              {customers.length === 0 
+                ? 'No customers yet. Click "Add Customer" to create one.'
+                : "No customers match your search criteria."}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -331,13 +479,14 @@ const CustomersTab = () => {
                     <TableHead>Customer</TableHead>
                     <TableHead>Access Code</TableHead>
                     <TableHead>Netflix Account</TableHead>
+                    <TableHead>Profile</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {customers.map((customer) => {
+                  {filteredCustomers.map((customer) => {
                     const status = getStatus(customer);
                     const endDate = addDays(new Date(customer.purchase_date), customer.subscription_days);
                     
@@ -375,6 +524,13 @@ const CustomersTab = () => {
                         <TableCell className="text-muted-foreground">
                           {customer.netflix_accounts?.netflix_email || "—"}
                         </TableCell>
+                        <TableCell>
+                          {customer.profile_number ? (
+                            <Badge variant="outline">P{customer.profile_number}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(endDate, "MMM d, yyyy")}
                         </TableCell>
@@ -409,6 +565,13 @@ const CustomersTab = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Auto-copy Message Dialog */}
+      <CustomerMessageDialog
+        open={messageDialogOpen}
+        onOpenChange={setMessageDialogOpen}
+        data={newCustomerData}
+      />
     </div>
   );
 };

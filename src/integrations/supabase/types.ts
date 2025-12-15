@@ -153,7 +153,12 @@ export type Database = {
     }
     Functions: {
       generate_access_code: { Args: never; Returns: string }
+      get_customer_by_access_code: {
+        Args: { p_access_code: string }
+        Returns: string
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      verify_access_code: { Args: { p_access_code: string }; Returns: string }
     }
     Enums: {
       subscription_status: "active" | "expired" | "suspended"

@@ -81,27 +81,33 @@ export type Database = {
       }
       netflix_accounts: {
         Row: {
+          account_created_date: string | null
           created_at: string
           gmail_address: string | null
           id: string
           netflix_email: string
           netflix_password: string
+          payment_account: string | null
           updated_at: string
         }
         Insert: {
+          account_created_date?: string | null
           created_at?: string
           gmail_address?: string | null
           id?: string
           netflix_email: string
           netflix_password: string
+          payment_account?: string | null
           updated_at?: string
         }
         Update: {
+          account_created_date?: string | null
           created_at?: string
           gmail_address?: string | null
           id?: string
           netflix_email?: string
           netflix_password?: string
+          payment_account?: string | null
           updated_at?: string
         }
         Relationships: []

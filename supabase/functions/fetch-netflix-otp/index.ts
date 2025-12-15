@@ -44,13 +44,18 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-// Search for Netflix emails and extract OTP
-async function fetchNetflixOtp(accessToken: string, gmailAddress: string): Promise<string | null> {
-  console.log(`Searching for Netflix OTP emails in ${gmailAddress}`);
+interface EmailResult {
+  verification_link: string | null;
+  otp_code: string | null;
+}
 
-  // Search for recent Netflix emails about household/verification
+// Search for Netflix emails and extract the verification link or OTP
+async function fetchNetflixVerification(accessToken: string, gmailAddress: string): Promise<EmailResult> {
+  console.log(`Searching for Netflix verification emails in ${gmailAddress}`);
+
+  // Search for recent Netflix emails about household/verification/temporary access
   const searchQuery = encodeURIComponent(
-    "from:info@account.netflix.com (household OR verification OR code) newer_than:1h"
+    "from:info@account.netflix.com (temporary access OR household OR verification) newer_than:1h"
   );
 
   const searchResponse = await fetch(
@@ -74,7 +79,7 @@ async function fetchNetflixOtp(accessToken: string, gmailAddress: string): Promi
   console.log(`Found ${messages.length} potential Netflix emails`);
 
   if (messages.length === 0) {
-    return null;
+    return { verification_link: null, otp_code: null };
   }
 
   // Get the most recent message
@@ -90,50 +95,96 @@ async function fetchNetflixOtp(accessToken: string, gmailAddress: string): Promi
 
   if (!messageResponse.ok) {
     console.error("Failed to fetch message content");
-    return null;
+    return { verification_link: null, otp_code: null };
   }
 
   const messageData = await messageResponse.json();
 
-  // Extract message body
-  let body = "";
+  // Extract message body (prefer HTML for link extraction)
+  let htmlBody = "";
+  let textBody = "";
   
   if (messageData.payload?.body?.data) {
-    body = atob(messageData.payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+    const decoded = atob(messageData.payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+    textBody = decoded;
+    htmlBody = decoded;
   } else if (messageData.payload?.parts) {
     for (const part of messageData.payload.parts) {
-      if (part.mimeType === "text/plain" && part.body?.data) {
-        body += atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-      } else if (part.mimeType === "text/html" && part.body?.data) {
-        body += atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+      if (part.mimeType === "text/html" && part.body?.data) {
+        htmlBody = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+      } else if (part.mimeType === "text/plain" && part.body?.data) {
+        textBody = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+      }
+      // Check nested parts (multipart/alternative)
+      if (part.parts) {
+        for (const subpart of part.parts) {
+          if (subpart.mimeType === "text/html" && subpart.body?.data) {
+            htmlBody = atob(subpart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+          } else if (subpart.mimeType === "text/plain" && subpart.body?.data) {
+            textBody = atob(subpart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+          }
+        }
       }
     }
   }
 
-  console.log("Searching for OTP in email body...");
+  console.log("Searching for verification link in email...");
 
-  // Look for verification codes in the email
-  // Netflix typically sends 4-6 digit codes
-  const otpPatterns = [
-    /(?:code|verification|verify|household)[:\s]*(\d{4,6})/i,
-    /(\d{4,6})\s*(?:is your|verification|code)/i,
-    /\b(\d{4,6})\b/g,
+  // Look for Netflix verification/household/temporary access links
+  // These typically look like: https://www.netflix.com/account/travel/verify?...
+  const linkPatterns = [
+    /https:\/\/www\.netflix\.com\/account\/travel\/verify[^\s"'<>]+/gi,
+    /https:\/\/www\.netflix\.com\/account\/household[^\s"'<>]+/gi,
+    /https:\/\/www\.netflix\.com[^\s"'<>]*(?:verify|code|access)[^\s"'<>]*/gi,
   ];
 
-  for (const pattern of otpPatterns) {
-    const match = body.match(pattern);
-    if (match) {
-      const code = match[1] || match[0];
-      // Validate it looks like an OTP (4-6 digits)
-      if (/^\d{4,6}$/.test(code)) {
-        console.log("Found OTP code:", code);
-        return code;
+  const bodyToSearch = htmlBody || textBody;
+  
+  for (const pattern of linkPatterns) {
+    const matches = bodyToSearch.match(pattern);
+    if (matches && matches.length > 0) {
+      // Clean up the link (remove any trailing quotes, brackets, etc.)
+      let link = matches[0].replace(/[&]amp;/g, "&");
+      // Remove HTML entities at the end
+      link = link.replace(/&[a-z]+;$/i, "");
+      console.log("Found verification link:", link);
+      return { verification_link: link, otp_code: null };
+    }
+  }
+
+  // Fallback: look for any Netflix link with "code" or "verify" in it
+  const genericNetflixLink = bodyToSearch.match(/https:\/\/[^\s"'<>]*netflix\.com[^\s"'<>]*/gi);
+  if (genericNetflixLink) {
+    for (const link of genericNetflixLink) {
+      if (link.includes("travel") || link.includes("verify") || link.includes("code") || link.includes("access")) {
+        const cleanLink = link.replace(/[&]amp;/g, "&").replace(/&[a-z]+;$/i, "");
+        console.log("Found Netflix verification link:", cleanLink);
+        return { verification_link: cleanLink, otp_code: null };
       }
     }
   }
 
-  console.log("No OTP found in email body");
-  return null;
+  // Also try to extract OTP code as fallback (for simpler verification emails)
+  console.log("No link found, searching for OTP code...");
+  const otpPatterns = [
+    /(?:code|verification|verify)[:\s]*(\d{4,6})/i,
+    /(\d{4,6})\s*(?:is your|verification|code)/i,
+  ];
+
+  const searchBody = textBody || htmlBody;
+  for (const pattern of otpPatterns) {
+    const match = searchBody.match(pattern);
+    if (match) {
+      const code = match[1] || match[0];
+      if (/^\d{4,6}$/.test(code)) {
+        console.log("Found OTP code:", code);
+        return { verification_link: null, otp_code: code };
+      }
+    }
+  }
+
+  console.log("No verification link or OTP found in email");
+  return { verification_link: null, otp_code: null };
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -152,54 +203,57 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Fetching OTP for Netflix account ${netflix_account_id} from ${gmail_address}`);
+    console.log(`Fetching verification for Netflix account ${netflix_account_id} from ${gmail_address}`);
 
     // Get fresh access token
     const accessToken = await getAccessToken();
 
-    // Fetch OTP from Gmail
-    const otpCode = await fetchNetflixOtp(accessToken, gmail_address);
+    // Fetch verification link or OTP from Gmail
+    const result = await fetchNetflixVerification(accessToken, gmail_address);
 
-    if (!otpCode) {
+    if (!result.verification_link && !result.otp_code) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "No recent verification code found. Please check if Netflix sent an email." 
+          message: "No recent verification email found. Please request a new code from Netflix first." 
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Store OTP in database
+    // Store in database
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Delete old OTPs for this account
+    // Delete old entries for this account
     await supabase
       .from("otp_logs")
       .delete()
       .eq("netflix_account_id", netflix_account_id);
 
-    // Insert new OTP
+    // Store the link or code
     const { error: insertError } = await supabase
       .from("otp_logs")
       .insert({
         netflix_account_id,
-        otp_code: otpCode,
+        otp_code: result.verification_link || result.otp_code || "",
         fetched_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
+        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes (link expiry)
       });
 
     if (insertError) {
-      console.error("Error storing OTP:", insertError);
+      console.error("Error storing verification:", insertError);
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        otp_code: otpCode,
-        message: "Verification code retrieved successfully" 
+        verification_link: result.verification_link,
+        otp_code: result.otp_code,
+        message: result.verification_link 
+          ? "Verification link retrieved successfully" 
+          : "Verification code retrieved successfully"
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -207,7 +261,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in fetch-netflix-otp function:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to fetch OTP" }),
+      JSON.stringify({ error: error.message || "Failed to fetch verification" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -30,6 +30,7 @@ interface CustomerData {
     id: string;
     netflix_email: string;
     netflix_password: string;
+    gmail_address: string | null;
   } | null;
 }
 
@@ -93,28 +94,73 @@ const CustomerDashboard = () => {
       return;
     }
 
+    const gmailAddress = customer.netflix_accounts.gmail_address;
+    
+    if (!gmailAddress) {
+      // If no Gmail linked, check for cached OTP only
+      try {
+        const { data: otpData } = await supabase
+          .from("otp_logs")
+          .select("otp_code")
+          .eq("netflix_account_id", customer.netflix_accounts.id)
+          .gt("expires_at", new Date().toISOString())
+          .order("fetched_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (otpData) {
+          setOtpCode(otpData.otp_code);
+          toast.success("Household code retrieved successfully");
+        } else {
+          toast.info("No Gmail linked to this account. Contact your admin for the verification code.");
+        }
+      } catch (error) {
+        console.error("Error checking cached OTP:", error);
+        toast.error("Failed to fetch household code");
+      }
+      return;
+    }
+
     setIsFetchingOtp(true);
     
     try {
-      // Check for recent OTP in logs first
-      const { data: otpData, error: otpError } = await supabase
-        .from("otp_logs")
-        .select("otp_code")
-        .eq("netflix_account_id", customer.netflix_accounts.id)
-        .gt("expires_at", new Date().toISOString())
-        .order("fetched_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // First, try to fetch fresh OTP from Gmail via edge function
+      const { data: functionData, error: functionError } = await supabase.functions.invoke(
+        "fetch-netflix-otp",
+        {
+          body: {
+            gmail_address: gmailAddress,
+            netflix_account_id: customer.netflix_accounts.id,
+          },
+        }
+      );
 
-      if (otpError) throw otpError;
+      if (functionError) {
+        console.error("Edge function error:", functionError);
+        // Fall back to cached OTP
+        const { data: otpData } = await supabase
+          .from("otp_logs")
+          .select("otp_code")
+          .eq("netflix_account_id", customer.netflix_accounts.id)
+          .gt("expires_at", new Date().toISOString())
+          .order("fetched_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (otpData) {
-        setOtpCode(otpData.otp_code);
+        if (otpData) {
+          setOtpCode(otpData.otp_code);
+          toast.success("Household code retrieved from cache");
+        } else {
+          toast.error("Could not fetch verification code. Please try again.");
+        }
+        return;
+      }
+
+      if (functionData?.success && functionData?.otp_code) {
+        setOtpCode(functionData.otp_code);
         toast.success("Household code retrieved successfully");
       } else {
-        // In production, this would call an edge function to fetch from Gmail
-        // For now, show a message
-        toast.info("No recent verification code found. Please check your email or contact support.");
+        toast.info(functionData?.message || "No recent verification code found in email.");
         setOtpCode(null);
       }
     } catch (error) {

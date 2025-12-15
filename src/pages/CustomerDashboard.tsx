@@ -40,6 +40,7 @@ interface CustomerData {
   subscription_days: number;
   is_active: boolean;
   profile_number: number | null;
+  purchased_from: string | null;
   netflix_accounts: {
     id: string;
     netflix_email: string;
@@ -231,7 +232,7 @@ const CustomerDashboard = () => {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Tv className="w-8 h-8 text-primary" />
-            <span className="font-display text-2xl tracking-wider text-foreground">STREAMFLOW</span>
+            <span className="font-display text-2xl tracking-wider text-foreground">NETCODE</span>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-muted-foreground text-sm hidden sm:block">
@@ -364,6 +365,18 @@ const CustomerDashboard = () => {
               <CardDescription>Your subscription timeline</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Purchased From */}
+              {customer.purchased_from && (
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Purchased From
+                  </label>
+                  <p className="text-foreground font-medium">
+                    {customer.purchased_from}
+                  </p>
+                </div>
+              )}
+
               {/* Purchase Date */}
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground uppercase tracking-wide">

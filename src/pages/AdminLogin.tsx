@@ -71,7 +71,7 @@ const AdminLogin = () => {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Tv className="w-8 h-8 text-primary" />
-            <span className="font-display text-2xl tracking-wider text-foreground">STREAMFLOW</span>
+            <span className="font-display text-2xl tracking-wider text-foreground">NETCODE</span>
           </div>
           <Button 
             variant="ghost" 

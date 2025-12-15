@@ -74,7 +74,7 @@ const AdminDashboard = () => {
           <div className="flex items-center gap-3">
             <Tv className="w-8 h-8 text-primary" />
             <div>
-              <span className="font-display text-xl tracking-wider text-foreground block">STREAMFLOW</span>
+              <span className="font-display text-xl tracking-wider text-foreground block">NETCODE</span>
               <span className="text-xs text-muted-foreground">Admin Panel</span>
             </div>
           </div>

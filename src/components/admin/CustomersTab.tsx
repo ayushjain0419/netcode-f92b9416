@@ -38,6 +38,7 @@ interface Customer {
   subscription_days: number;
   is_active: boolean;
   profile_number: number | null;
+  purchased_from: string | null;
   netflix_accounts: NetflixAccount | null;
 }
 
@@ -49,6 +50,7 @@ interface CustomerMessageData {
   subscriptionDays: number;
   purchaseDate: string;
   accessCode: string;
+  purchasedFrom: string | null;
 }
 
 // ============================================
@@ -72,14 +74,15 @@ const CustomersTab = () => {
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [newCustomerData, setNewCustomerData] = useState<CustomerMessageData | null>(null);
   
-  // Form data with profile_number field
+  // Form data with profile_number and purchased_from fields
   const [formData, setFormData] = useState({
     name: "",
     netflix_account_id: "",
     purchase_date: format(new Date(), "yyyy-MM-dd"),
     subscription_days: "30",
     is_active: true,
-    profile_number: "" // 1-5 or empty
+    profile_number: "", // 1-5 or empty
+    purchased_from: ""
   });
 
   useEffect(() => {
@@ -197,7 +200,8 @@ const CustomersTab = () => {
             purchase_date: formData.purchase_date,
             subscription_days: parseInt(formData.subscription_days),
             is_active: formData.is_active,
-            profile_number: formData.profile_number ? parseInt(formData.profile_number) : null
+            profile_number: formData.profile_number ? parseInt(formData.profile_number) : null,
+            purchased_from: formData.purchased_from || null
           })
           .eq("id", editingCustomer.id);
 
@@ -218,7 +222,8 @@ const CustomersTab = () => {
             purchase_date: formData.purchase_date,
             subscription_days: parseInt(formData.subscription_days),
             is_active: formData.is_active,
-            profile_number: formData.profile_number ? parseInt(formData.profile_number) : null
+            profile_number: formData.profile_number ? parseInt(formData.profile_number) : null,
+            purchased_from: formData.purchased_from || null
           });
 
         if (error) throw error;
@@ -231,7 +236,8 @@ const CustomersTab = () => {
           profileNumber: formData.profile_number ? parseInt(formData.profile_number) : null,
           subscriptionDays: parseInt(formData.subscription_days),
           purchaseDate: formData.purchase_date,
-          accessCode: accessCode
+          accessCode: accessCode,
+          purchasedFrom: formData.purchased_from || null
         });
         
         setIsDialogOpen(false);
@@ -299,7 +305,8 @@ const CustomersTab = () => {
       purchase_date: format(new Date(), "yyyy-MM-dd"),
       subscription_days: "30",
       is_active: true,
-      profile_number: ""
+      profile_number: "",
+      purchased_from: ""
     });
     setEditingCustomer(null);
   };
@@ -312,7 +319,8 @@ const CustomersTab = () => {
       purchase_date: customer.purchase_date,
       subscription_days: customer.subscription_days.toString(),
       is_active: customer.is_active,
-      profile_number: customer.profile_number?.toString() || ""
+      profile_number: customer.profile_number?.toString() || "",
+      purchased_from: customer.purchased_from || ""
     });
     setIsDialogOpen(true);
   };
@@ -425,6 +433,18 @@ const CustomersTab = () => {
                 </div>
               </div>
 
+              {/* Purchased From */}
+              <div className="space-y-2">
+                <Label htmlFor="purchased_from">Purchased From (Reseller)</Label>
+                <Input
+                  id="purchased_from"
+                  placeholder="e.g., Reseller name or Direct"
+                  value={formData.purchased_from}
+                  onChange={(e) => setFormData(prev => ({ ...prev, purchased_from: e.target.value }))}
+                  className="bg-input"
+                />
+              </div>
+
               {/* Active Checkbox */}
               <div className="flex items-center gap-2">
                 <input
@@ -480,6 +500,7 @@ const CustomersTab = () => {
                     <TableHead>Access Code</TableHead>
                     <TableHead>Netflix Account</TableHead>
                     <TableHead>Profile</TableHead>
+                    <TableHead>Reseller</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -530,6 +551,9 @@ const CustomersTab = () => {
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {customer.purchased_from || "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(endDate, "MMM d, yyyy")}

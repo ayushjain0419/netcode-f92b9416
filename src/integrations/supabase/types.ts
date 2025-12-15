@@ -40,6 +40,7 @@ export type Database = {
           is_active: boolean
           name: string
           netflix_account_id: string | null
+          profile_number: number | null
           purchase_date: string
           subscription_days: number
           updated_at: string
@@ -51,6 +52,7 @@ export type Database = {
           is_active?: boolean
           name: string
           netflix_account_id?: string | null
+          profile_number?: number | null
           purchase_date?: string
           subscription_days?: number
           updated_at?: string
@@ -62,6 +64,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           netflix_account_id?: string | null
+          profile_number?: number | null
           purchase_date?: string
           subscription_days?: number
           updated_at?: string

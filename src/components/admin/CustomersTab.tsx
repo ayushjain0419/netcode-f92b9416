@@ -250,14 +250,14 @@ const CustomersTab = () => {
               <div className="space-y-2">
                 <Label htmlFor="netflix_account">Assign Netflix Account</Label>
                 <Select
-                  value={formData.netflix_account_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, netflix_account_id: value }))}
+                  value={formData.netflix_account_id || "none"}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, netflix_account_id: value === "none" ? "" : value }))}
                 >
                   <SelectTrigger className="bg-input">
                     <SelectValue placeholder="Select an account" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {accounts.map(account => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.netflix_email}

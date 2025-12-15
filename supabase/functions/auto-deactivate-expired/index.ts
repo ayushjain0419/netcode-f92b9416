@@ -13,15 +13,15 @@ Deno.serve(async (req) => {
   const cronSecret = Deno.env.get("CRON_SECRET");
 
   if (!cronSecret) {
-    console.error("CRON_SECRET environment variable not configured");
+    console.error("[INTERNAL] CRON_SECRET environment variable not configured");
     return new Response(
-      JSON.stringify({ error: "Internal configuration error" }),
+      JSON.stringify({ error: "Service configuration error" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
   if (authHeader !== `Bearer ${cronSecret}`) {
-    console.warn("Unauthorized cron function access attempt");
+    console.warn("[SECURITY] Unauthorized cron function access attempt");
     return new Response(
       JSON.stringify({ error: "Unauthorized" }),
       { status: 401, headers: { "Content-Type": "application/json" } }
@@ -36,18 +36,17 @@ Deno.serve(async (req) => {
 
     // Get current date
     const today = new Date().toISOString().split("T")[0];
-    console.log(`Running auto-deactivate check for date: ${today}`);
+    console.log(`[INTERNAL] Running auto-deactivate check for date: ${today}`);
 
     // Find all active customers whose subscription has expired
-    // Subscription expires when: purchase_date + subscription_days <= today
     const { data: expiredCustomers, error: fetchError } = await supabase
       .from("customers")
       .select("id, name, purchase_date, subscription_days")
       .eq("is_active", true);
 
     if (fetchError) {
-      console.error("Error fetching customers:", fetchError);
-      throw fetchError;
+      console.error("[INTERNAL] Error fetching customers:", fetchError);
+      throw new Error("Database query failed");
     }
 
     // Filter expired customers
@@ -60,7 +59,7 @@ Deno.serve(async (req) => {
     });
 
     if (customersToDeactivate.length === 0) {
-      console.log("No expired subscriptions found");
+      console.log("[INTERNAL] No expired subscriptions found");
       return new Response(
         JSON.stringify({
           success: true,
@@ -80,28 +79,26 @@ Deno.serve(async (req) => {
       .in("id", idsToDeactivate);
 
     if (updateError) {
-      console.error("Error deactivating customers:", updateError);
-      throw updateError;
+      console.error("[INTERNAL] Error deactivating customers:", updateError);
+      throw new Error("Database update failed");
     }
 
-    console.log(`Deactivated ${customersToDeactivate.length} expired subscriptions`);
+    console.log(`[INTERNAL] Deactivated ${customersToDeactivate.length} expired subscriptions`);
     
     return new Response(
       JSON.stringify({
         success: true,
         message: `Deactivated ${customersToDeactivate.length} expired subscription(s)`,
         deactivated_count: customersToDeactivate.length,
-        deactivated_customers: customersToDeactivate.map((c) => c.name),
       }),
       { headers: { "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    console.error("Error in auto-deactivate function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("[INTERNAL] Error in auto-deactivate function:", error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: errorMessage,
+        error: "Operation failed",
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );

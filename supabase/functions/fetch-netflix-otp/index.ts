@@ -7,8 +7,7 @@ const corsHeaders = {
 };
 
 interface FetchOtpRequest {
-  gmail_address: string;
-  netflix_account_id: string;
+  access_code: string;
 }
 
 // Get new access token using refresh token
@@ -194,11 +193,52 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { gmail_address, netflix_account_id }: FetchOtpRequest = await req.json();
+    const { access_code }: FetchOtpRequest = await req.json();
 
-    if (!gmail_address || !netflix_account_id) {
+    // Validate access code format (6 digits)
+    if (!access_code || !/^\d{6}$/.test(access_code)) {
       return new Response(
-        JSON.stringify({ error: "Gmail address and Netflix account ID are required" }),
+        JSON.stringify({ error: "Valid 6-digit access code is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Validating access code and fetching customer data...`);
+
+    // Validate access code and get customer/netflix account data using secure RPC
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: customerData, error: customerError } = await supabase.rpc(
+      "get_customer_data_by_access_code",
+      { p_access_code: access_code }
+    );
+
+    if (customerError) {
+      console.error("Error validating access code:", customerError);
+      return new Response(
+        JSON.stringify({ error: "Failed to validate access code" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const customer = Array.isArray(customerData) ? customerData[0] : customerData;
+
+    if (!customer) {
+      console.log("Invalid or inactive access code");
+      return new Response(
+        JSON.stringify({ error: "Invalid or inactive access code" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const gmail_address = customer.gmail_address;
+    const netflix_account_id = customer.netflix_account_id;
+
+    if (!gmail_address) {
+      return new Response(
+        JSON.stringify({ error: "No Gmail address linked to this account" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -220,11 +260,6 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Store in database
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Delete old entries for this account
     await supabase

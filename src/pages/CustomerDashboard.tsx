@@ -173,6 +173,13 @@ const CustomerDashboard = () => {
       return;
     }
 
+    const storedAccessCode = sessionStorage.getItem("customerAccessCode");
+    if (!storedAccessCode) {
+      toast.error("Session expired. Please log in again.");
+      navigate("/");
+      return;
+    }
+
     setIsFetchingOtp(true);
     setVerificationLink(null);
     setOtpCode(null);
@@ -182,8 +189,7 @@ const CustomerDashboard = () => {
         "fetch-netflix-otp",
         {
           body: {
-            gmail_address: gmailAddress,
-            netflix_account_id: customer.netflix_accounts.id,
+            access_code: storedAccessCode,
           },
         }
       );

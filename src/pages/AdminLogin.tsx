@@ -12,7 +12,6 @@ const AdminLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,62 +25,36 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/admin`
-          }
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        if (error) throw error;
-
-        if (data.user) {
-          // Create admin user record
-          const { error: insertError } = await supabase
-            .from("admin_users")
-            .insert({ id: data.user.id, email: data.user.email });
-
-          if (insertError) {
-            console.error("Error creating admin record:", insertError);
-          }
-
-          toast.success("Account created successfully! You can now log in.");
-          setIsSignUp(false);
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("Invalid email or password");
+        } else {
+          throw error;
         }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        return;
+      }
 
-        if (error) {
-          if (error.message.includes("Invalid login credentials")) {
-            toast.error("Invalid email or password");
-          } else {
-            throw error;
-          }
+      if (data.session) {
+        // Verify admin status
+        const { data: adminData, error: adminError } = await supabase
+          .from("admin_users")
+          .select("id")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (adminError || !adminData) {
+          await supabase.auth.signOut();
+          toast.error("Access denied. Not an admin account.");
           return;
         }
 
-        if (data.session) {
-          // Verify admin status
-          const { data: adminData, error: adminError } = await supabase
-            .from("admin_users")
-            .select("id")
-            .eq("id", data.user.id)
-            .maybeSingle();
-
-          if (adminError || !adminData) {
-            await supabase.auth.signOut();
-            toast.error("Access denied. Not an admin account.");
-            return;
-          }
-
-          toast.success("Welcome back!");
-          navigate("/admin");
-        }
+        toast.success("Welcome back!");
+        navigate("/admin");
       }
     } catch (error: any) {
       console.error("Auth error:", error);
@@ -119,13 +92,10 @@ const AdminLogin = () => {
               <Shield className="w-8 h-8 text-primary" />
             </div>
             <CardTitle className="font-display text-3xl tracking-wide">
-              {isSignUp ? "Create Admin Account" : "Admin Login"}
+              Admin Login
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              {isSignUp 
-                ? "Set up your administrator account"
-                : "Access the subscription management panel"
-              }
+              Access the subscription management panel
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -168,40 +138,12 @@ const AdminLogin = () => {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <span className="animate-pulse">
-                    {isSignUp ? "Creating Account..." : "Signing In..."}
-                  </span>
+                  <span className="animate-pulse">Signing In...</span>
                 ) : (
-                  isSignUp ? "Create Account" : "Sign In"
+                  "Sign In"
                 )}
               </Button>
             </form>
-
-            <div className="mt-6 pt-6 border-t border-border">
-              <p className="text-sm text-center text-muted-foreground">
-                {isSignUp ? (
-                  <>
-                    Already have an account?{" "}
-                    <button 
-                      onClick={() => setIsSignUp(false)}
-                      className="text-primary hover:underline"
-                    >
-                      Sign in
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Need an admin account?{" "}
-                    <button 
-                      onClick={() => setIsSignUp(true)}
-                      className="text-primary hover:underline"
-                    >
-                      Create one
-                    </button>
-                  </>
-                )}
-              </p>
-            </div>
           </CardContent>
         </Card>
       </main>

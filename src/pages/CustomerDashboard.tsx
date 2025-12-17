@@ -185,17 +185,21 @@ const CustomerDashboard = () => {
     setOtpCode(null);
     
     try {
-      const { data: functionData, error: functionError } = await supabase.functions.invoke(
-        "fetch-netflix-otp",
-        {
-          body: {
-            access_code: storedAccessCode,
-          },
-        }
-      );
+      // Call Lovable Cloud edge function directly (separate from external Supabase database)
+      const LOVABLE_CLOUD_URL = "https://tlfrnykndmgiwurclnlg.supabase.co";
+      const response = await fetch(`${LOVABLE_CLOUD_URL}/functions/v1/fetch-netflix-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZnJueWtuZG1naXd1cmNsbmxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3NTI4ODYsImV4cCI6MjA4MTMyODg4Nn0.DUhGhKayjys-uvedGZl98kK58s8HpBQe2lTgSbc0-oI`,
+        },
+        body: JSON.stringify({ access_code: storedAccessCode }),
+      });
 
-      if (functionError) {
-        console.error("Edge function error:", functionError);
+      const functionData = await response.json();
+
+      if (!response.ok) {
+        console.error("Edge function error:", functionData);
         toast.error("Could not fetch verification. Please try again.");
         return;
       }

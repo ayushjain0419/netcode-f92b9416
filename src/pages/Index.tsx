@@ -23,12 +23,22 @@ const Index = () => {
     setIsLoading(true);
     
     try {
-      // Use rate-limited edge function for secure access code validation
-      const { data, error } = await supabase.functions.invoke("validate-access-code", {
-        body: { access_code: accessCode },
+      // Call Lovable Cloud edge function directly (separate from external Supabase database)
+      const LOVABLE_CLOUD_URL = "https://tlfrnykndmgiwurclnlg.supabase.co";
+      const response = await fetch(`${LOVABLE_CLOUD_URL}/functions/v1/validate-access-code`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZnJueWtuZG1naXd1cmNsbmxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3NTI4ODYsImV4cCI6MjA4MTMyODg4Nn0.DUhGhKayjys-uvedGZl98kK58s8HpBQe2lTgSbc0-oI`,
+        },
+        body: JSON.stringify({ access_code: accessCode }),
       });
 
-      if (error) throw error;
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Request failed");
+      }
 
       if (data?.error) {
         if (data.retry_after) {

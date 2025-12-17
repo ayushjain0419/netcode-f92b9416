@@ -136,9 +136,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`[INTERNAL] Access code validation attempt from IP: ${clientIP}, remaining attempts: ${rateCheck.remaining}`);
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Initialize Supabase client - use external Supabase if configured, otherwise fallback to Lovable Cloud
+    const supabaseUrl = Deno.env.get("EXT_SUPABASE_URL") || Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("EXT_SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Call the secure RPC function

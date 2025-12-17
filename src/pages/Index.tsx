@@ -23,20 +23,23 @@ const Index = () => {
     setIsLoading(true);
     
     try {
-      // Use RPC function for secure access code validation
-      const { data, error } = await supabase.rpc("get_customer_data_by_access_code", {
-        p_access_code: accessCode,
+      // Use rate-limited edge function for secure access code validation
+      const { data, error } = await supabase.functions.invoke("validate-access-code", {
+        body: { access_code: accessCode },
       });
 
-      if (error) {
-        console.error("Error validating code:", error);
-        toast.error("Failed to validate access code");
+      if (error) throw error;
+
+      if (data?.error) {
+        if (data.retry_after) {
+          toast.error(`Too many attempts. Please try again in ${Math.ceil(data.retry_after / 60)} minutes.`);
+        } else {
+          toast.error(data.error);
+        }
         return;
       }
 
-      const customerData = Array.isArray(data) ? data[0] : data;
-
-      if (!customerData) {
+      if (!data?.success || !data?.customer) {
         toast.error("Invalid or inactive access code");
         return;
       }

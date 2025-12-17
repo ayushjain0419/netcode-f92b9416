@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ALLOWED_ORIGINS = [
   "https://netcode.lovable.app",
   "https://tlfrnykndmgiwurclnlg.lovable.app",
+  "https://netcode-net.vercel.app",
   "http://localhost:5173",
   "http://localhost:8080",
 ];

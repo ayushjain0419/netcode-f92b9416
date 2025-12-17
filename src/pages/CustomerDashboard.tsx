@@ -185,31 +185,30 @@ const CustomerDashboard = () => {
     setOtpCode(null);
     
     try {
-      const { data: functionData, error: functionError } = await supabase.functions.invoke(
-        "fetch-netflix-otp",
-        {
-          body: {
-            access_code: storedAccessCode,
-          },
-        }
-      );
+      // Use RPC function to get cached OTP from database
+      const { data, error } = await supabase.rpc("get_otp_by_access_code", {
+        p_access_code: storedAccessCode,
+      });
 
-      if (functionError) {
-        console.error("Edge function error:", functionError);
+      if (error) {
+        console.error("Error fetching OTP:", error);
         toast.error("Could not fetch verification. Please try again.");
         return;
       }
 
-      if (functionData?.success) {
-        if (functionData.verification_link) {
-          setVerificationLink(functionData.verification_link);
+      const otpData = Array.isArray(data) ? data[0] : data;
+
+      if (otpData?.otp_code) {
+        // Check if the OTP contains a URL (verification link) or a code
+        if (otpData.otp_code.startsWith("http")) {
+          setVerificationLink(otpData.otp_code);
           toast.success("Verification link retrieved! Click the button to get your code.");
-        } else if (functionData.otp_code) {
-          setOtpCode(functionData.otp_code);
+        } else {
+          setOtpCode(otpData.otp_code);
           toast.success("Verification code retrieved successfully");
         }
       } else {
-        toast.info(functionData?.message || "No recent verification email found. Request a code from Netflix first.");
+        toast.info("No recent verification found. Contact your subscription provider if you need a household verification code.");
       }
     } catch (error) {
       console.error("Error fetching verification:", error);

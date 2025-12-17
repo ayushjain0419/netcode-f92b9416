@@ -185,13 +185,14 @@ const CustomerDashboard = () => {
     setOtpCode(null);
     
     try {
-      // Call Lovable Cloud edge function directly (separate from external Supabase database)
-      const LOVABLE_CLOUD_URL = "https://tlfrnykndmgiwurclnlg.supabase.co";
-      const response = await fetch(`${LOVABLE_CLOUD_URL}/functions/v1/fetch-netflix-otp`, {
+      // Call external Supabase edge function
+      const EXTERNAL_SUPABASE_URL = "https://amircbtzhohjgvglrzmx.supabase.co";
+      const EXTERNAL_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaXJjYnR6aG9oamd2Z2xyem14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NDcwMTIsImV4cCI6MjA4MTUyMzAxMn0.rrw5EkUUooPbuEEbmYNeybugEZP4NSRvZCMv6RmotDc";
+      const response = await fetch(`${EXTERNAL_SUPABASE_URL}/functions/v1/fetch-netflix-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZnJueWtuZG1naXd1cmNsbmxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3NTI4ODYsImV4cCI6MjA4MTMyODg4Nn0.DUhGhKayjys-uvedGZl98kK58s8HpBQe2lTgSbc0-oI`,
+          "Authorization": `Bearer ${EXTERNAL_ANON_KEY}`,
         },
         body: JSON.stringify({ access_code: storedAccessCode }),
       });

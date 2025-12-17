@@ -271,9 +271,8 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`[INTERNAL] Validating access code and fetching customer data...`);
 
     // Validate access code and get customer/netflix account data using secure RPC
-    // Use external Supabase if configured, otherwise fallback to Lovable Cloud
-    const supabaseUrl = Deno.env.get("EXT_SUPABASE_URL") || Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("EXT_SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: customerData, error: customerError } = await supabase.rpc(

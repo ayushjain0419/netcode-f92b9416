@@ -36,37 +36,28 @@ interface CustomerMessageDialogProps {
 
 // Generate the formatted WhatsApp message
 const generateMessage = (data: CustomerMessageData): string => {
-  const profileText = data.profileNumber ? `${data.profileNumber}` : "N/A";
-  const validityText = `${data.subscriptionDays} Days`;
-  const issueDate = format(new Date(data.purchaseDate), "dd MMM yyyy");
-  const purchasedFromText = data.purchasedFrom ? `\n🏪 | Purchased From - ${data.purchasedFrom}` : "";
-  
-  return `𝐍𝐄𝐓𝐅𝐋𝐈𝐗 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐀𝐂𝐂𝐎𝐔𝐍𝐓
+  return `🎬 NETCODE – Netflix Access
 
-📧 : ID : ${data.netflixEmail}
-🔐 : Password : ${data.netflixPassword}
-👨🏻‍💻 | Profile : ${profileText}
-📍 | PIN : None
-🛍️ | Plan - Premium
-🍿 | Allowed streams - 1
-⏳ | Validity - ${validityText}
-📅 | Issue Date - ${issueDate}${purchasedFromText}
+Your Netflix is active ✅
 
-How to login:
-https://drive.google.com/drive/folders/1Yz-94GkWzU_-kN5UzUxWhs5cQ9Jn5bMd
+🔗 Visit: https://netcode-net.vercel.app/
+🔐 Enter the Access Code: "${data.accessCode}"
+📄 View all account details & updates anytime
 
-Website: netcode.site
+🏠 If Netflix asks for Household Verification, use the Household link on the website.
 
-NOTE:
-• DO NOT change profile name or PIN
-• DO NOT exceed screen limit
-• NO other changes allowed
-• Violation = No refund / replacement
+✅ This system ensures smooth & guaranteed access throughout your subscription.
 
-LOGIN & SEND SCREENSHOT
+⚠ Important Rules
+🚫 Don't change profile name or PIN
+🚫 Don't exceed screen limit
+🚫 No other changes allowed
+🚫 Use on one device only
 
----
-Access Code: ${data.accessCode}`;
+❗ Rule violation = No refund / replacement
+
+Enjoy streaming 🍿
+– NETCODE`;
 };
 
 const CustomerMessageDialog = ({

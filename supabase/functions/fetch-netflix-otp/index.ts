@@ -6,6 +6,7 @@ const ALLOWED_ORIGINS = [
   "https://netcode.lovable.app",
   "https://tlfrnykndmgiwurclnlg.lovable.app",
   "https://netcode-net.vercel.app",
+  "https://netcode-six.vercel.app",
   "http://localhost:5173",
   "http://localhost:8080",
 ];

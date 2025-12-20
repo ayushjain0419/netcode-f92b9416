@@ -502,6 +502,7 @@ const CustomersTab = () => {
                     <TableHead>Profile</TableHead>
                     <TableHead>Reseller</TableHead>
                     <TableHead>End Date</TableHead>
+                    <TableHead>Days Left</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -557,6 +558,15 @@ const CustomersTab = () => {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(endDate, "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const daysLeft = differenceInDays(endDate, new Date());
+                            if (daysLeft < 0) return <span className="text-destructive font-medium">Expired</span>;
+                            if (daysLeft === 0) return <span className="text-destructive font-medium">Today</span>;
+                            if (daysLeft <= 7) return <span className="text-yellow-500 font-medium">{daysLeft} days</span>;
+                            return <span className="text-green-500 font-medium">{daysLeft} days</span>;
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Badge variant={status.variant}>{status.label}</Badge>

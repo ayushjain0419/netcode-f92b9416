@@ -15,7 +15,7 @@ import {
 import { Copy, Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 
 interface CustomerMessageData {
   customerName: string;
@@ -36,25 +36,37 @@ interface CustomerMessageDialogProps {
 
 // Generate the formatted WhatsApp message
 const generateMessage = (data: CustomerMessageData): string => {
-  return `🎬 NETCODE – Netflix Access
+  const purchaseDate = format(new Date(data.purchaseDate), "dd MMM yyyy");
+  const expiryDate = format(addDays(new Date(data.purchaseDate), data.subscriptionDays), "dd MMM yyyy");
+  
+  return `🎬 NETCODE – Netflix Access Active ✅
 
-Your Netflix is active ✅
+Your Netflix access is active.
+
+📅 Purchase Date: ${purchaseDate}
+📅 Expiry Date: ${expiryDate}
+
+🔑 Access Steps
 
 🔗 Visit: https://netcode-net.vercel.app/
-🔐 Enter the Access Code: "${data.accessCode}"
-📄 View all account details & updates anytime
+🔐 Access Code: ${data.accessCode}
 
-🏠 If Netflix asks for Household Verification, use the Household link on the website.
+All Netflix ID, password & updates will be available on the website dashboard.
+If there are any changes, they will be updated there only.
 
-✅ This system ensures smooth & guaranteed access throughout your subscription.
+🏠 Household Verification
 
-⚠ Important Rules
+If Netflix asks for household verification, use the household link/code from the website.
+For subscriptions longer than 1 month, account details may change monthly and will be updated on the dashboard.
+
+⚠️ Important Rules
+
 🚫 Don't change profile name or PIN
 🚫 Don't exceed screen limit
 🚫 No other changes allowed
 🚫 Use on one device only
 
-❗ Rule violation = No refund / replacement
+❗ No refund or replacement on rule violation
 
 Enjoy streaming 🍿
 – NETCODE`;

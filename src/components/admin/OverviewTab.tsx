@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, CreditCard, CheckCircle, AlertCircle, Calendar } from "lucide-react";
-import { differenceInDays, addDays } from "date-fns";
+import { Users, CreditCard, CheckCircle, AlertCircle, Calendar, RotateCw, Clock } from "lucide-react";
+import { differenceInDays, addDays, format } from "date-fns";
 
 interface Stats {
   totalAccounts: number;
@@ -17,6 +17,12 @@ interface DurationStats {
   days90Plus: number;
   days180Plus: number;
   days365Plus: number;
+}
+
+interface RotationCustomer {
+  name: string;
+  daysLeft: number;
+  subscriptionDays: number;
 }
 
 interface OverviewTabProps {
@@ -37,6 +43,7 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
     days180Plus: 0,
     days365Plus: 0
   });
+  const [rotationCustomers, setRotationCustomers] = useState<RotationCustomer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -53,7 +60,7 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
       // Fetch all customers with subscription info
       const { data: customers } = await supabase
         .from("customers")
-        .select("purchase_date, subscription_days, is_active");
+        .select("name, purchase_date, subscription_days, is_active");
 
       const now = new Date();
       let activeCount = 0;
@@ -65,6 +72,9 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
       let days90Plus = 0;
       let days180Plus = 0;
       let days365Plus = 0;
+      
+      // Rotation tracking - customers with 30+ day plans approaching renewal
+      const needsRotation: RotationCustomer[] = [];
 
       customers?.forEach(customer => {
         const endDate = addDays(new Date(customer.purchase_date), customer.subscription_days);
@@ -83,8 +93,27 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
           if (customer.subscription_days >= 90) days90Plus++;
           if (customer.subscription_days >= 180) days180Plus++;
           if (customer.subscription_days >= 365) days365Plus++;
+          
+          // Check if 30+ day subscriber needs rotation (within 7 days of monthly cycle)
+          // Monthly rotation happens every 30 days from purchase
+          if (customer.subscription_days >= 30) {
+            const daysSincePurchase = differenceInDays(now, new Date(customer.purchase_date));
+            const daysIntoCurrentMonth = daysSincePurchase % 30;
+            const daysUntilNextRotation = 30 - daysIntoCurrentMonth;
+            
+            if (daysUntilNextRotation <= 7 && daysRemaining > 0) {
+              needsRotation.push({
+                name: customer.name,
+                daysLeft: daysUntilNextRotation,
+                subscriptionDays: customer.subscription_days
+              });
+            }
+          }
         }
       });
+
+      // Sort by days until rotation
+      needsRotation.sort((a, b) => a.daysLeft - b.daysLeft);
 
       setStats({
         totalAccounts: accountsCount || 0,
@@ -100,6 +129,8 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
         days180Plus,
         days365Plus
       });
+      
+      setRotationCustomers(needsRotation);
     } catch (error) {
       console.error("Error fetching stats:", error);
     } finally {
@@ -173,6 +204,47 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
         ))}
       </div>
 
+      {/* Account Rotation Alert */}
+      {rotationCustomers.length > 0 && (
+        <Card className="glass border-warning/50 bg-warning/5">
+          <CardHeader>
+            <CardTitle className="font-display text-xl tracking-wide flex items-center gap-2 text-warning">
+              <RotateCw className="w-5 h-5" />
+              Account Rotation Needed ({rotationCustomers.length})
+            </CardTitle>
+            <CardDescription>
+              30+ day subscribers approaching their monthly account rotation
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {rotationCustomers.slice(0, 6).map((customer, index) => (
+                <div 
+                  key={index}
+                  className="bg-background/50 rounded-lg p-3 border border-border/50 flex items-center justify-between"
+                >
+                  <div>
+                    <p className="font-medium text-foreground">{customer.name}</p>
+                    <p className="text-xs text-muted-foreground">{customer.subscriptionDays} day plan</p>
+                  </div>
+                  <div className="flex items-center gap-1 text-warning">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {customer.daysLeft === 0 ? "Today" : `${customer.daysLeft}d`}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {rotationCustomers.length > 6 && (
+              <p className="text-sm text-muted-foreground mt-3 text-center">
+                +{rotationCustomers.length - 6} more customers need rotation
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Subscription Duration Stats */}
       <Card className="glass">
         <CardHeader>
@@ -180,7 +252,7 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
             <Calendar className="w-5 h-5 text-primary" />
             Subscription Duration Breakdown
           </CardTitle>
-          <CardDescription>Active customers grouped by subscription length</CardDescription>
+          <CardDescription>Active customers grouped by subscription length (click to filter)</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">

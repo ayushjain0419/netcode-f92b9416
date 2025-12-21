@@ -23,6 +23,8 @@ const AdminDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [durationFilter, setDurationFilter] = useState<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,6 +56,11 @@ const AdminDashboard = () => {
     await supabase.auth.signOut();
     toast.success("Logged out successfully");
     navigate("/admin/login");
+  };
+
+  const handleDurationClick = (days: number) => {
+    setDurationFilter(days);
+    setActiveTab("customers");
   };
 
   if (isLoading) {
@@ -92,7 +99,7 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); if (val !== "customers") setDurationFilter(null); }} className="space-y-6">
           <TabsList className="bg-card border border-border">
             <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="w-4 h-4 mr-2" />
@@ -109,7 +116,7 @@ const AdminDashboard = () => {
           </TabsList>
 
           <TabsContent value="overview" className="animate-fade-in">
-            <OverviewTab />
+            <OverviewTab onDurationClick={handleDurationClick} />
           </TabsContent>
 
           <TabsContent value="accounts" className="animate-fade-in">
@@ -117,7 +124,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="customers" className="animate-fade-in">
-            <CustomersTab />
+            <CustomersTab durationFilter={durationFilter} onClearDurationFilter={() => setDurationFilter(null)} />
           </TabsContent>
         </Tabs>
       </main>

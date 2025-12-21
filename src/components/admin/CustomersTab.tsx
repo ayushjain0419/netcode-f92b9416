@@ -54,11 +54,16 @@ interface CustomerMessageData {
   purchasedFrom: string | null;
 }
 
+interface CustomersTabProps {
+  durationFilter?: number | null;
+  onClearDurationFilter?: () => void;
+}
+
 // ============================================
 // COMPONENT
 // ============================================
 
-const CustomersTab = () => {
+const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabProps) => {
   // State for customers and accounts
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [accounts, setAccounts] = useState<NetflixAccount[]>([]);
@@ -182,9 +187,16 @@ const CustomersTab = () => {
         (profileFilter === "none" && customer.profile_number === null) ||
         (customer.profile_number?.toString() === profileFilter);
 
-      return matchesSearch && matchesStatus && matchesProfile;
+      // Duration filter (from Overview tab click)
+      const endDate = addDays(new Date(customer.purchase_date), customer.subscription_days);
+      const daysRemaining = differenceInDays(endDate, new Date());
+      const matchesDuration = 
+        !durationFilter || 
+        (customer.is_active && daysRemaining > 0 && customer.subscription_days >= durationFilter);
+
+      return matchesSearch && matchesStatus && matchesProfile && matchesDuration;
     });
-  }, [customers, searchTerm, statusFilter, profileFilter]);
+  }, [customers, searchTerm, statusFilter, profileFilter, durationFilter]);
 
   // ============================================
   // CRUD OPERATIONS
@@ -567,6 +579,23 @@ const CustomersTab = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Duration Filter Banner */}
+      {durationFilter && (
+        <Card className="bg-primary/10 border-primary/30">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-foreground">
+                Showing customers with <strong>{durationFilter}+ days</strong> subscription
+              </span>
+              <Button variant="ghost" size="sm" onClick={onClearDurationFilter}>
+                <XCircle className="w-4 h-4 mr-2" />
+                Clear Filter
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search and Filters */}
       <CustomerFilters

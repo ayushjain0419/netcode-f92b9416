@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Copy, RefreshCw, User } from "lucide-react";
+import { Plus, Edit, Trash2, Copy, RefreshCw, User, Users, Clock, XCircle, CheckSquare } from "lucide-react";
 import { format, differenceInDays, addDays } from "date-fns";
 import CustomerFilters from "./CustomerFilters";
 import CustomerMessageDialog from "./CustomerMessageDialog";
@@ -64,6 +65,14 @@ const CustomersTab = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  
+  // Bulk selection state
+  const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set());
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkAction, setBulkAction] = useState<"extend" | "deactivate" | "reassign" | null>(null);
+  const [bulkExtendDays, setBulkExtendDays] = useState("30");
+  const [bulkAccountId, setBulkAccountId] = useState("");
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState("");
@@ -295,6 +304,95 @@ const CustomersTab = () => {
   };
 
   // ============================================
+  // BULK ACTIONS
+  // ============================================
+
+  const toggleSelectAll = () => {
+    if (selectedCustomers.size === filteredCustomers.length) {
+      setSelectedCustomers(new Set());
+    } else {
+      setSelectedCustomers(new Set(filteredCustomers.map(c => c.id)));
+    }
+  };
+
+  const toggleSelectCustomer = (id: string) => {
+    const newSelected = new Set(selectedCustomers);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedCustomers(newSelected);
+  };
+
+  const openBulkDialog = (action: "extend" | "deactivate" | "reassign") => {
+    setBulkAction(action);
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedCustomers.size === 0) {
+      toast.error("No customers selected");
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    const selectedIds = Array.from(selectedCustomers);
+
+    try {
+      if (bulkAction === "extend") {
+        // Extend subscription for selected customers
+        for (const id of selectedIds) {
+          const customer = customers.find(c => c.id === id);
+          if (customer) {
+            const newDays = customer.subscription_days + parseInt(bulkExtendDays);
+            await supabase
+              .from("customers")
+              .update({ subscription_days: newDays })
+              .eq("id", id);
+          }
+        }
+        toast.success(`Extended subscription for ${selectedIds.length} customers by ${bulkExtendDays} days`);
+      } else if (bulkAction === "deactivate") {
+        // Deactivate selected customers
+        const { error } = await supabase
+          .from("customers")
+          .update({ is_active: false })
+          .in("id", selectedIds);
+        
+        if (error) throw error;
+        toast.success(`Deactivated ${selectedIds.length} customers`);
+      } else if (bulkAction === "reassign") {
+        // Reassign Netflix account
+        if (!bulkAccountId) {
+          toast.error("Please select a Netflix account");
+          setIsBulkProcessing(false);
+          return;
+        }
+        const { error } = await supabase
+          .from("customers")
+          .update({ netflix_account_id: bulkAccountId === "none" ? null : bulkAccountId })
+          .in("id", selectedIds);
+        
+        if (error) throw error;
+        const accountEmail = accounts.find(a => a.id === bulkAccountId)?.netflix_email || "None";
+        toast.success(`Reassigned ${selectedIds.length} customers to ${accountEmail}`);
+      }
+
+      setBulkDialogOpen(false);
+      setSelectedCustomers(new Set());
+      setBulkExtendDays("30");
+      setBulkAccountId("");
+      fetchCustomers();
+    } catch (error: any) {
+      console.error("Bulk action error:", error);
+      toast.error(error.message || "Bulk action failed");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // ============================================
   // FORM HELPERS
   // ============================================
 
@@ -480,6 +578,121 @@ const CustomersTab = () => {
         onProfileFilterChange={setProfileFilter}
       />
 
+      {/* Bulk Actions Toolbar */}
+      {selectedCustomers.size > 0 && (
+        <Card className="bg-primary/10 border-primary/30">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-5 h-5 text-primary" />
+                <span className="font-medium text-foreground">
+                  {selectedCustomers.size} customer{selectedCustomers.size > 1 ? "s" : ""} selected
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => openBulkDialog("extend")}>
+                  <Clock className="w-4 h-4 mr-2" />
+                  Extend Subscription
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => openBulkDialog("reassign")}>
+                  <Users className="w-4 h-4 mr-2" />
+                  Reassign Account
+                </Button>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => openBulkDialog("deactivate")}>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Deactivate
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedCustomers(new Set())}>
+                  Clear Selection
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bulk Action Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl tracking-wide">
+              {bulkAction === "extend" && "Extend Subscriptions"}
+              {bulkAction === "deactivate" && "Deactivate Customers"}
+              {bulkAction === "reassign" && "Reassign Netflix Account"}
+            </DialogTitle>
+            <DialogDescription>
+              This action will affect {selectedCustomers.size} customer{selectedCustomers.size > 1 ? "s" : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {bulkAction === "extend" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Add Days to Subscription</Label>
+                <Select value={bulkExtendDays} onValueChange={setBulkExtendDays}>
+                  <SelectTrigger className="bg-input">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">7 days</SelectItem>
+                    <SelectItem value="14">14 days</SelectItem>
+                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="60">60 days</SelectItem>
+                    <SelectItem value="90">90 days</SelectItem>
+                    <SelectItem value="180">180 days</SelectItem>
+                    <SelectItem value="365">365 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          {bulkAction === "reassign" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Select Netflix Account</Label>
+                <Select value={bulkAccountId} onValueChange={setBulkAccountId}>
+                  <SelectTrigger className="bg-input">
+                    <SelectValue placeholder="Choose an account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Remove Assignment</SelectItem>
+                    {accounts.map(account => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.netflix_email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Use this to change the Netflix account for customers after monthly rotation.
+              </p>
+            </div>
+          )}
+          
+          {bulkAction === "deactivate" && (
+            <p className="text-muted-foreground">
+              Are you sure you want to deactivate {selectedCustomers.size} customer{selectedCustomers.size > 1 ? "s" : ""}? 
+              They will no longer have access to their accounts.
+            </p>
+          )}
+          
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBulkDialogOpen(false)} disabled={isBulkProcessing}>
+              Cancel
+            </Button>
+            <Button 
+              variant={bulkAction === "deactivate" ? "destructive" : "netflix"} 
+              onClick={handleBulkAction}
+              disabled={isBulkProcessing}
+            >
+              {isBulkProcessing ? "Processing..." : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Customers Table */}
       <Card className="glass">
         <CardContent className="p-0">
@@ -496,6 +709,12 @@ const CustomersTab = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="border-border">
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedCustomers.size === filteredCustomers.length && filteredCustomers.length > 0}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Access Code</TableHead>
                     <TableHead>Netflix Account</TableHead>
@@ -513,7 +732,13 @@ const CustomersTab = () => {
                     const endDate = addDays(new Date(customer.purchase_date), customer.subscription_days);
                     
                     return (
-                      <TableRow key={customer.id} className="border-border">
+                      <TableRow key={customer.id} className={`border-border ${selectedCustomers.has(customer.id) ? 'bg-primary/5' : ''}`}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedCustomers.has(customer.id)}
+                            onCheckedChange={() => toggleSelectCustomer(customer.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-muted-foreground" />

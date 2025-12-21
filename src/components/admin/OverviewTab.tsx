@@ -19,7 +19,11 @@ interface DurationStats {
   days365Plus: number;
 }
 
-const OverviewTab = () => {
+interface OverviewTabProps {
+  onDurationClick?: (days: number) => void;
+}
+
+const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
   const [stats, setStats] = useState<Stats>({
     totalAccounts: 0,
     totalCustomers: 0,
@@ -135,11 +139,11 @@ const OverviewTab = () => {
   ];
 
   const durationCards = [
-    { title: "30+ Days", value: durationStats.days30Plus, description: "Monthly subscribers" },
-    { title: "60+ Days", value: durationStats.days60Plus, description: "2-month plans" },
-    { title: "90+ Days", value: durationStats.days90Plus, description: "Quarterly plans" },
-    { title: "180+ Days", value: durationStats.days180Plus, description: "Half-yearly plans" },
-    { title: "365+ Days", value: durationStats.days365Plus, description: "Annual subscribers" }
+    { title: "30+ Days", value: durationStats.days30Plus, description: "Monthly subscribers", days: 30 },
+    { title: "60+ Days", value: durationStats.days60Plus, description: "2-month plans", days: 60 },
+    { title: "90+ Days", value: durationStats.days90Plus, description: "Quarterly plans", days: 90 },
+    { title: "180+ Days", value: durationStats.days180Plus, description: "Half-yearly plans", days: 180 },
+    { title: "365+ Days", value: durationStats.days365Plus, description: "Annual subscribers", days: 365 }
   ];
 
   return (
@@ -183,8 +187,9 @@ const OverviewTab = () => {
             {durationCards.map((item, index) => (
               <div 
                 key={item.title} 
-                className="bg-muted/30 rounded-lg p-4 border border-border/50 text-center animate-slide-up"
+                className="bg-muted/30 rounded-lg p-4 border border-border/50 text-center animate-slide-up cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-all"
                 style={{ animationDelay: `${index * 0.1}s` }}
+                onClick={() => onDurationClick?.(item.days)}
               >
                 <p className="text-3xl font-bold text-primary">{isLoading ? "..." : item.value}</p>
                 <p className="font-medium text-foreground mt-1">{item.title}</p>

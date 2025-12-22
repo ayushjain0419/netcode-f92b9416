@@ -12,12 +12,11 @@ import {
   Users, 
   CreditCard, 
   Settings,
-  Plus,
-  RefreshCw
 } from "lucide-react";
 import NetflixAccountsTab from "@/components/admin/NetflixAccountsTab";
 import CustomersTab from "@/components/admin/CustomersTab";
 import OverviewTab from "@/components/admin/OverviewTab";
+import NotificationBell from "@/components/admin/NotificationBell";
 
 const AdminDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -85,10 +84,15 @@ const AdminDashboard = () => {
               <span className="text-xs text-muted-foreground">Admin Panel</span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:block">
               {user.email}
             </span>
+            <NotificationBell 
+              onCustomerClick={() => {
+                setActiveTab("customers");
+              }} 
+            />
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Logout

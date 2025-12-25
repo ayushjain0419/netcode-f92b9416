@@ -12,11 +12,13 @@ import {
   Users, 
   CreditCard, 
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 import NetflixAccountsTab from "@/components/admin/NetflixAccountsTab";
 import CustomersTab from "@/components/admin/CustomersTab";
 import OverviewTab from "@/components/admin/OverviewTab";
 import NotificationBell from "@/components/admin/NotificationBell";
+import AdminManagementTab from "@/components/admin/AdminManagementTab";
 
 const AdminDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -117,6 +119,10 @@ const AdminDashboard = () => {
               <Users className="w-4 h-4 mr-2" />
               Customers
             </TabsTrigger>
+            <TabsTrigger value="admins" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <ShieldCheck className="w-4 h-4 mr-2" />
+              Admins
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="animate-fade-in">
@@ -129,6 +135,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="customers" className="animate-fade-in">
             <CustomersTab durationFilter={durationFilter} onClearDurationFilter={() => setDurationFilter(null)} />
+          </TabsContent>
+
+          <TabsContent value="admins" className="animate-fade-in">
+            <AdminManagementTab />
           </TabsContent>
         </Tabs>
       </main>

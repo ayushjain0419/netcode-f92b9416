@@ -30,7 +30,7 @@ const CustomerFilters = ({
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name or Netflix email..."
+          placeholder="Search by name, email or access code..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-10 bg-input"

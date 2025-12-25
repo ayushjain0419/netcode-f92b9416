@@ -169,12 +169,13 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
-      // Search filter - check name and netflix email
+      // Search filter - check name, netflix email, and access code
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = 
         searchTerm === "" ||
         customer.name.toLowerCase().includes(searchLower) ||
-        (customer.netflix_accounts?.netflix_email?.toLowerCase().includes(searchLower) ?? false);
+        (customer.netflix_accounts?.netflix_email?.toLowerCase().includes(searchLower) ?? false) ||
+        customer.access_code.includes(searchTerm);
 
       // Status filter
       const status = getStatus(customer);

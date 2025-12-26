@@ -43,6 +43,7 @@ export type Database = {
           profile_number: number | null
           purchase_date: string
           purchased_from: string | null
+          selling_price: number | null
           subscription_days: number
           updated_at: string
         }
@@ -56,6 +57,7 @@ export type Database = {
           profile_number?: number | null
           purchase_date?: string
           purchased_from?: string | null
+          selling_price?: number | null
           subscription_days?: number
           updated_at?: string
         }
@@ -69,6 +71,7 @@ export type Database = {
           profile_number?: number | null
           purchase_date?: string
           purchased_from?: string | null
+          selling_price?: number | null
           subscription_days?: number
           updated_at?: string
         }

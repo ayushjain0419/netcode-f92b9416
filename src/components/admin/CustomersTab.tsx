@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Copy, RefreshCw, User, Users, Clock, XCircle, CheckSquare, DollarSign } from "lucide-react";
+import { Plus, Edit, Trash2, Copy, RefreshCw, User, Users, Clock, XCircle, CheckSquare } from "lucide-react";
 import { format, differenceInDays, addDays } from "date-fns";
 import CustomerFilters from "./CustomerFilters";
 import CustomerMessageDialog from "./CustomerMessageDialog";
@@ -40,7 +40,6 @@ interface Customer {
   is_active: boolean;
   profile_number: number | null;
   purchased_from: string | null;
-  selling_price: number | null;
   netflix_accounts: NetflixAccount | null;
 }
 
@@ -89,7 +88,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [newCustomerData, setNewCustomerData] = useState<CustomerMessageData | null>(null);
   
-  // Form data with profile_number, purchased_from, and selling_price fields
+  // Form data with profile_number and purchased_from fields
   const [formData, setFormData] = useState({
     name: "",
     netflix_account_id: "",
@@ -97,8 +96,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
     subscription_days: "30",
     is_active: true,
     profile_number: "", // 1-5 or empty
-    purchased_from: "",
-    selling_price: ""
+    purchased_from: ""
   });
 
   useEffect(() => {
@@ -225,8 +223,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
             subscription_days: parseInt(formData.subscription_days),
             is_active: formData.is_active,
             profile_number: formData.profile_number ? parseInt(formData.profile_number) : null,
-            purchased_from: formData.purchased_from || null,
-            selling_price: formData.selling_price ? parseFloat(formData.selling_price) : null
+            purchased_from: formData.purchased_from || null
           })
           .eq("id", editingCustomer.id);
 
@@ -248,8 +245,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
             subscription_days: parseInt(formData.subscription_days),
             is_active: formData.is_active,
             profile_number: formData.profile_number ? parseInt(formData.profile_number) : null,
-            purchased_from: formData.purchased_from || null,
-            selling_price: formData.selling_price ? parseFloat(formData.selling_price) : null
+            purchased_from: formData.purchased_from || null
           });
 
         if (error) throw error;
@@ -421,8 +417,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
       subscription_days: "30",
       is_active: true,
       profile_number: "",
-      purchased_from: "",
-      selling_price: ""
+      purchased_from: ""
     });
     setEditingCustomer(null);
   };
@@ -436,31 +431,10 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
       subscription_days: customer.subscription_days.toString(),
       is_active: customer.is_active,
       profile_number: customer.profile_number?.toString() || "",
-      purchased_from: customer.purchased_from || "",
-      selling_price: customer.selling_price?.toString() || ""
+      purchased_from: customer.purchased_from || ""
     });
     setIsDialogOpen(true);
   };
-
-  // Calculate sales summary by reseller
-  const salesSummary = useMemo(() => {
-    const summary: Record<string, { count: number; total: number }> = {};
-    let grandTotal = 0;
-    
-    customers.forEach((customer) => {
-      const price = customer.selling_price || 0;
-      const source = customer.purchased_from || "Direct";
-      
-      if (!summary[source]) {
-        summary[source] = { count: 0, total: 0 };
-      }
-      summary[source].count += 1;
-      summary[source].total += price;
-      grandTotal += price;
-    });
-    
-    return { bySource: summary, grandTotal };
-  }, [customers]);
 
   // ============================================
   // RENDER
@@ -570,31 +544,16 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                 </div>
               </div>
 
-              {/* Purchased From and Selling Price */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="purchased_from">Purchased From</Label>
-                  <Input
-                    id="purchased_from"
-                    placeholder="e.g., Reseller name"
-                    value={formData.purchased_from}
-                    onChange={(e) => setFormData(prev => ({ ...prev, purchased_from: e.target.value }))}
-                    className="bg-input"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="selling_price">Selling Price (₹)</Label>
-                  <Input
-                    id="selling_price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="e.g., 199"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData(prev => ({ ...prev, selling_price: e.target.value }))}
-                    className="bg-input"
-                  />
-                </div>
+              {/* Purchased From */}
+              <div className="space-y-2">
+                <Label htmlFor="purchased_from">Purchased From (Reseller)</Label>
+                <Input
+                  id="purchased_from"
+                  placeholder="e.g., Reseller name or Direct"
+                  value={formData.purchased_from}
+                  onChange={(e) => setFormData(prev => ({ ...prev, purchased_from: e.target.value }))}
+                  className="bg-input"
+                />
               </div>
 
               {/* Active Checkbox */}
@@ -638,30 +597,6 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
           </CardContent>
         </Card>
       )}
-
-      {/* Sales Summary Card */}
-      <Card className="glass border-green-500/30 bg-green-500/5">
-        <CardContent className="py-4">
-          <div className="flex items-center gap-2 mb-3">
-            <DollarSign className="w-5 h-5 text-green-500" />
-            <h3 className="font-display text-lg text-foreground">Sales Summary</h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {Object.entries(salesSummary.bySource).map(([source, data]) => (
-              <div key={source} className="bg-background/50 rounded-lg p-3">
-                <p className="text-xs text-muted-foreground truncate">{source}</p>
-                <p className="text-lg font-bold text-foreground">₹{data.total.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">{data.count} sales</p>
-              </div>
-            ))}
-            <div className="bg-green-500/10 rounded-lg p-3 border border-green-500/30">
-              <p className="text-xs text-green-400">Total Revenue</p>
-              <p className="text-lg font-bold text-green-500">₹{salesSummary.grandTotal.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">{customers.length} customers</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Search and Filters */}
       <CustomerFilters
@@ -815,7 +750,6 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                     <TableHead>Netflix Account</TableHead>
                     <TableHead>Profile</TableHead>
                     <TableHead>Reseller</TableHead>
-                    <TableHead>Price</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Days Left</TableHead>
                     <TableHead>Status</TableHead>
@@ -876,9 +810,6 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {customer.purchased_from || "—"}
-                        </TableCell>
-                        <TableCell className="text-green-500 font-medium">
-                          {customer.selling_price ? `₹${customer.selling_price.toLocaleString()}` : "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(endDate, "MMM d, yyyy")}

@@ -13,12 +13,14 @@ import {
   CreditCard, 
   Settings,
   ShieldCheck,
+  Download,
 } from "lucide-react";
 import NetflixAccountsTab from "@/components/admin/NetflixAccountsTab";
 import CustomersTab from "@/components/admin/CustomersTab";
 import OverviewTab from "@/components/admin/OverviewTab";
 import NotificationBell from "@/components/admin/NotificationBell";
 import AdminManagementTab from "@/components/admin/AdminManagementTab";
+import { useExcelBackup } from "@/hooks/useExcelBackup";
 
 const AdminDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -26,6 +28,7 @@ const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [durationFilter, setDurationFilter] = useState<number | null>(null);
+  const { exportToExcel, isExporting } = useExcelBackup();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -90,6 +93,16 @@ const AdminDashboard = () => {
             <span className="text-sm text-muted-foreground hidden sm:block">
               {user.email}
             </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exportToExcel}
+              disabled={isExporting}
+              className="hidden sm:flex"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {isExporting ? "Exporting..." : "Backup"}
+            </Button>
             <NotificationBell 
               onCustomerClick={() => {
                 setActiveTab("customers");

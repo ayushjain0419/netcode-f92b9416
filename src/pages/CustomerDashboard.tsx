@@ -186,8 +186,8 @@ const CustomerDashboard = () => {
     
     try {
       // Call external Supabase edge function
-      const EXTERNAL_SUPABASE_URL = "https://amircbtzhohjgvglrzmx.supabase.co";
-      const EXTERNAL_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtaXJjYnR6aG9oamd2Z2xyem14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NDcwMTIsImV4cCI6MjA4MTUyMzAxMn0.rrw5EkUUooPbuEEbmYNeybugEZP4NSRvZCMv6RmotDc";
+      const EXTERNAL_SUPABASE_URL = "https://sxievqswvpotqdpjreyd.supabase.co";
+      const EXTERNAL_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4aWV2cXN3dnBvdHFkcGpyZXlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3NjMwNzIsImV4cCI6MjA4MjMzOTA3Mn0.F2sD3mMJHc-yaB2oica2Jq73mkN4jY7yyv8es59irzs";
       const response = await fetch(`${EXTERNAL_SUPABASE_URL}/functions/v1/fetch-netflix-otp`, {
         method: "POST",
         headers: {

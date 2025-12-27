@@ -96,7 +96,8 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
     subscription_days: "30",
     is_active: true,
     profile_number: "", // 1-5 or empty
-    purchased_from: ""
+    purchased_from: "",
+    custom_access_code: "" // Optional custom access code
   });
 
   useEffect(() => {
@@ -231,8 +232,8 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
         toast.success("Customer updated successfully");
         setIsDialogOpen(false);
       } else {
-        // Create new customer
-        const accessCode = generateAccessCode();
+        // Create new customer - use custom code if provided, otherwise generate
+        const accessCode = formData.custom_access_code.trim() || generateAccessCode();
         const selectedAccount = accounts.find(a => a.id === formData.netflix_account_id);
         
         const { error } = await supabase
@@ -417,7 +418,8 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
       subscription_days: "30",
       is_active: true,
       profile_number: "",
-      purchased_from: ""
+      purchased_from: "",
+      custom_access_code: ""
     });
     setEditingCustomer(null);
   };
@@ -431,7 +433,8 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
       subscription_days: customer.subscription_days.toString(),
       is_active: customer.is_active,
       profile_number: customer.profile_number?.toString() || "",
-      purchased_from: customer.purchased_from || ""
+      purchased_from: customer.purchased_from || "",
+      custom_access_code: "" // Not editable when editing
     });
     setIsDialogOpen(true);
   };
@@ -555,6 +558,22 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                   className="bg-input"
                 />
               </div>
+
+              {/* Custom Access Code - only show when creating new customer */}
+              {!editingCustomer && (
+                <div className="space-y-2">
+                  <Label htmlFor="custom_access_code">Access Code (Optional)</Label>
+                  <Input
+                    id="custom_access_code"
+                    placeholder="Leave blank for auto-generated code"
+                    value={formData.custom_access_code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, custom_access_code: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                    maxLength={6}
+                    className="bg-input"
+                  />
+                  <p className="text-xs text-muted-foreground">Enter a 6-digit code or leave blank to auto-generate</p>
+                </div>
+              )}
 
               {/* Active Checkbox */}
               <div className="flex items-center gap-2">

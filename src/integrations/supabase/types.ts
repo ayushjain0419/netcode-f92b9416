@@ -91,7 +91,7 @@ export type Database = {
           created_at: string
           gmail_address: string | null
           id: string
-          netflix_email: string
+          netflix_email: string | null
           netflix_password: string
           payment_account: string | null
           phone_number: string | null
@@ -102,7 +102,7 @@ export type Database = {
           created_at?: string
           gmail_address?: string | null
           id?: string
-          netflix_email: string
+          netflix_email?: string | null
           netflix_password: string
           payment_account?: string | null
           phone_number?: string | null
@@ -113,7 +113,7 @@ export type Database = {
           created_at?: string
           gmail_address?: string | null
           id?: string
-          netflix_email?: string
+          netflix_email?: string | null
           netflix_password?: string
           payment_account?: string | null
           phone_number?: string | null

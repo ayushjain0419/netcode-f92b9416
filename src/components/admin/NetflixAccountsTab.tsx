@@ -179,8 +179,8 @@ const NetflixAccountsTab = () => {
                 <Label htmlFor="netflix_email">Netflix Email (or Phone)</Label>
                 <Input
                   id="netflix_email"
-                  type="email"
-                  placeholder="netflix@example.com"
+                  type="text"
+                  placeholder="email@example.com or phone number"
                   value={formData.netflix_email}
                   onChange={(e) => setFormData(prev => ({ ...prev, netflix_email: e.target.value }))}
                   className="bg-input"

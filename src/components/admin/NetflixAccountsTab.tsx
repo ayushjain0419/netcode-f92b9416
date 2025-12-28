@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Mail, Eye, EyeOff, Calendar, CreditCard } from "lucide-react";
+import { Plus, Edit, Trash2, Mail, Eye, EyeOff, Calendar, CreditCard, Phone } from "lucide-react";
 
 interface NetflixAccount {
   id: string;
@@ -16,6 +16,7 @@ interface NetflixAccount {
   gmail_address: string | null;
   account_created_date: string | null;
   payment_account: string | null;
+  phone_number: string | null;
   created_at: string;
 }
 
@@ -31,7 +32,8 @@ const NetflixAccountsTab = () => {
     netflix_password: "",
     gmail_address: "",
     account_created_date: "",
-    payment_account: ""
+    payment_account: "",
+    phone_number: ""
   });
 
   useEffect(() => {
@@ -72,7 +74,8 @@ const NetflixAccountsTab = () => {
             netflix_password: formData.netflix_password,
             gmail_address: formData.gmail_address || null,
             account_created_date: formData.account_created_date || null,
-            payment_account: formData.payment_account || null
+            payment_account: formData.payment_account || null,
+            phone_number: formData.phone_number || null
           })
           .eq("id", editingAccount.id);
 
@@ -86,7 +89,8 @@ const NetflixAccountsTab = () => {
             netflix_password: formData.netflix_password,
             gmail_address: formData.gmail_address || null,
             account_created_date: formData.account_created_date || null,
-            payment_account: formData.payment_account || null
+            payment_account: formData.payment_account || null,
+            phone_number: formData.phone_number || null
           });
 
         if (error) throw error;
@@ -121,7 +125,7 @@ const NetflixAccountsTab = () => {
   };
 
   const resetForm = () => {
-    setFormData({ netflix_email: "", netflix_password: "", gmail_address: "", account_created_date: "", payment_account: "" });
+    setFormData({ netflix_email: "", netflix_password: "", gmail_address: "", account_created_date: "", payment_account: "", phone_number: "" });
     setEditingAccount(null);
   };
 
@@ -132,7 +136,8 @@ const NetflixAccountsTab = () => {
       netflix_password: account.netflix_password,
       gmail_address: account.gmail_address || "",
       account_created_date: account.account_created_date || "",
-      payment_account: account.payment_account || ""
+      payment_account: account.payment_account || "",
+      phone_number: account.phone_number || ""
     });
     setIsDialogOpen(true);
   };
@@ -222,6 +227,17 @@ const NetflixAccountsTab = () => {
                   className="bg-input"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone_number">Phone Number (Optional)</Label>
+                <Input
+                  id="phone_number"
+                  type="tel"
+                  placeholder="e.g., +1234567890"
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
+                  className="bg-input"
+                />
+              </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>
                   Cancel
@@ -250,6 +266,7 @@ const NetflixAccountsTab = () => {
                   <TableHead>Netflix Email</TableHead>
                   <TableHead>Password</TableHead>
                   <TableHead>Linked Gmail</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Created Date</TableHead>
                   <TableHead>Payment Account</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -285,6 +302,12 @@ const NetflixAccountsTab = () => {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {account.gmail_address || "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        {account.phone_number || "—"}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       <div className="flex items-center gap-2">

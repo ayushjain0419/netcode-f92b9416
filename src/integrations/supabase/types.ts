@@ -94,6 +94,7 @@ export type Database = {
           netflix_email: string
           netflix_password: string
           payment_account: string | null
+          phone_number: string | null
           updated_at: string
         }
         Insert: {
@@ -104,6 +105,7 @@ export type Database = {
           netflix_email: string
           netflix_password: string
           payment_account?: string | null
+          phone_number?: string | null
           updated_at?: string
         }
         Update: {
@@ -114,6 +116,7 @@ export type Database = {
           netflix_email?: string
           netflix_password?: string
           payment_account?: string | null
+          phone_number?: string | null
           updated_at?: string
         }
         Relationships: []

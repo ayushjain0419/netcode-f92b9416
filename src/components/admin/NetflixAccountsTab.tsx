@@ -60,8 +60,13 @@ const NetflixAccountsTab = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.netflix_email || !formData.netflix_password) {
-      toast.error("Email and password are required");
+    if (!formData.netflix_email && !formData.phone_number) {
+      toast.error("Either email or phone number is required");
+      return;
+    }
+
+    if (!formData.netflix_password) {
+      toast.error("Password is required");
       return;
     }
 
@@ -171,7 +176,7 @@ const NetflixAccountsTab = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="netflix_email">Netflix Email</Label>
+                <Label htmlFor="netflix_email">Netflix Email (or Phone)</Label>
                 <Input
                   id="netflix_email"
                   type="email"
@@ -180,6 +185,7 @@ const NetflixAccountsTab = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, netflix_email: e.target.value }))}
                   className="bg-input"
                 />
+                <p className="text-xs text-muted-foreground">Enter email or phone number below</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="netflix_password">Netflix Password</Label>
@@ -228,7 +234,7 @@ const NetflixAccountsTab = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone_number">Phone Number (Optional)</Label>
+                <Label htmlFor="phone_number">Netflix Phone Number (or Email above)</Label>
                 <Input
                   id="phone_number"
                   type="tel"
@@ -237,6 +243,7 @@ const NetflixAccountsTab = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
                   className="bg-input"
                 />
+                <p className="text-xs text-muted-foreground">Use this instead of email if account uses phone login</p>
               </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>

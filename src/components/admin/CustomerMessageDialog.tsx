@@ -38,38 +38,54 @@ interface CustomerMessageDialogProps {
 const generateMessage = (data: CustomerMessageData): string => {
   const purchaseDate = format(new Date(data.purchaseDate), "dd MMM yyyy");
   const expiryDate = format(addDays(new Date(data.purchaseDate), data.subscriptionDays), "dd MMM yyyy");
+  const resellerName = data.purchasedFrom || "NETCODE";
   
   return `🎬 NETCODE – Netflix Access Active ✅
 
-Your Netflix access is active.
 
-📅 Purchase Date: ${purchaseDate}
-📅 Expiry Date: ${expiryDate}
+Hi ${data.customerName} 👋
+Your Netflix access is now active. Enjoy seamless streaming 🍿
 
-🔑 Access Steps
 
-🔗 Visit: https://netcode-net.vercel.app/
+📅 Subscription Details
+
+Purchase Date: ${purchaseDate}
+
+Expiry Date: ${expiryDate}
+
+
+🔑 How to Access Your Account
+
+🔗 Website: https://netcode-net.vercel.app/
 🔐 Access Code: ${data.accessCode}
 
-All Netflix ID, password & updates will be available on the website dashboard.
-If there are any changes, they will be updated there only.
+
+All Netflix ID, password, household link, and future updates will be available only on the dashboard.
+Any changes will be updated there automatically.
+
 
 🏠 Household Verification
 
-If Netflix asks for household verification, use the household link/code from the website.
-For subscriptions longer than 1 month, account details may change monthly and will be updated on the dashboard.
+If Netflix asks for household verification:
 
-⚠️ Important Rules
+Use the household link/code provided on the dashboard
 
-🚫 Don't change profile name or PIN
-🚫 Don't exceed screen limit
+For subscriptions longer than 1 month, account details may change monthly and will be updated on the website
+
+
+⚠️ Important Rules (Strict)
+
+🚫 Do NOT change profile name or PIN
+🚫 Do NOT exceed screen limit
 🚫 No other changes allowed
-🚫 Use on one device only
+🚫 One device only
 
-❗ No refund or replacement on rule violation
+❗ Rule violation will lead to permanent access removal
+❗ No refund or replacement
 
-Enjoy streaming 🍿
-– NETCODE`;
+
+✨ Enjoy uninterrupted Netflix streaming
+— ${resellerName}`;
 };
 
 const CustomerMessageDialog = ({

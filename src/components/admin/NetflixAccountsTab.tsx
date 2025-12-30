@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Mail, Eye, EyeOff, Calendar, CreditCard, Phone } from "lucide-react";
+import { Plus, Edit, Trash2, Mail, Eye, EyeOff, Calendar, CreditCard, Phone, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 interface NetflixAccount {
   id: string;
@@ -18,7 +20,10 @@ interface NetflixAccount {
   payment_account: string | null;
   phone_number: string | null;
   created_at: string;
+  customer_count?: number; // Number of customers assigned to this account
 }
+
+const MAX_SLOTS = 7; // Maximum customers per Netflix account
 
 const NetflixAccountsTab = () => {
   const [accounts, setAccounts] = useState<NetflixAccount[]>([]);
@@ -42,13 +47,36 @@ const NetflixAccountsTab = () => {
 
   const fetchAccounts = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch accounts
+      const { data: accountsData, error: accountsError } = await supabase
         .from("netflix_accounts")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setAccounts(data || []);
+      if (accountsError) throw accountsError;
+
+      // Fetch customer counts for each account
+      const { data: customersData, error: customersError } = await supabase
+        .from("customers")
+        .select("netflix_account_id");
+
+      if (customersError) throw customersError;
+
+      // Count customers per account
+      const customerCounts: Record<string, number> = {};
+      (customersData || []).forEach((customer) => {
+        if (customer.netflix_account_id) {
+          customerCounts[customer.netflix_account_id] = (customerCounts[customer.netflix_account_id] || 0) + 1;
+        }
+      });
+
+      // Add customer count to each account
+      const accountsWithCounts = (accountsData || []).map((account) => ({
+        ...account,
+        customer_count: customerCounts[account.id] || 0,
+      }));
+
+      setAccounts(accountsWithCounts);
     } catch (error) {
       console.error("Error fetching accounts:", error);
       toast.error("Failed to load Netflix accounts");
@@ -271,6 +299,7 @@ const NetflixAccountsTab = () => {
               <TableHeader>
                 <TableRow className="border-border">
                   <TableHead>Netflix Email</TableHead>
+                  <TableHead>Slots Used</TableHead>
                   <TableHead>Password</TableHead>
                   <TableHead>Linked Gmail</TableHead>
                   <TableHead>Phone</TableHead>
@@ -285,7 +314,29 @@ const NetflixAccountsTab = () => {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4 text-muted-foreground" />
-                        {account.netflix_email}
+                        {account.netflix_email || account.phone_number}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1 min-w-[100px]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Users className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">
+                              {account.customer_count || 0}/{MAX_SLOTS}
+                            </span>
+                          </div>
+                          <Badge 
+                            variant={(account.customer_count || 0) >= MAX_SLOTS ? "destructive" : (account.customer_count || 0) >= 5 ? "outline" : "default"}
+                            className="text-xs"
+                          >
+                            {(account.customer_count || 0) >= MAX_SLOTS ? "Full" : `${MAX_SLOTS - (account.customer_count || 0)} free`}
+                          </Badge>
+                        </div>
+                        <Progress 
+                          value={((account.customer_count || 0) / MAX_SLOTS) * 100} 
+                          className="h-1.5"
+                        />
                       </div>
                     </TableCell>
                     <TableCell>

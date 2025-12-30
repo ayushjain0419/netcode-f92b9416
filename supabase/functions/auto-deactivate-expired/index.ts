@@ -70,12 +70,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Deactivate expired customers
+    // Deactivate expired customers and free up their slots
     const idsToDeactivate = customersToDeactivate.map((c) => c.id);
     
     const { error: updateError } = await supabase
       .from("customers")
-      .update({ is_active: false })
+      .update({ is_active: false, netflix_account_id: null, profile_number: null })
       .in("id", idsToDeactivate);
 
     if (updateError) {

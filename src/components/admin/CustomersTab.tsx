@@ -28,7 +28,10 @@ interface NetflixAccount {
   id: string;
   netflix_email: string;
   netflix_password: string;
+  customer_count?: number; // Number of customers assigned
 }
+
+const MAX_SLOTS = 7; // Maximum customers per Netflix account
 
 interface Customer {
   id: string;
@@ -128,12 +131,35 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
 
   const fetchAccounts = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch accounts
+      const { data: accountsData, error: accountsError } = await supabase
         .from("netflix_accounts")
         .select("id, netflix_email, netflix_password");
 
-      if (error) throw error;
-      setAccounts(data || []);
+      if (accountsError) throw accountsError;
+
+      // Fetch customer counts for each account
+      const { data: customersData, error: customersError } = await supabase
+        .from("customers")
+        .select("netflix_account_id");
+
+      if (customersError) throw customersError;
+
+      // Count customers per account
+      const customerCounts: Record<string, number> = {};
+      (customersData || []).forEach((customer) => {
+        if (customer.netflix_account_id) {
+          customerCounts[customer.netflix_account_id] = (customerCounts[customer.netflix_account_id] || 0) + 1;
+        }
+      });
+
+      // Add customer count to each account
+      const accountsWithCounts = (accountsData || []).map((account) => ({
+        ...account,
+        customer_count: customerCounts[account.id] || 0,
+      }));
+
+      setAccounts(accountsWithCounts);
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
@@ -480,7 +506,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                 />
               </div>
               
-              {/* Netflix Account Selection */}
+              {/* Netflix Account Selection - Only show accounts with free slots */}
               <div className="space-y-2">
                 <Label htmlFor="netflix_account">Assign Netflix Account</Label>
                 <Select
@@ -492,13 +518,27 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {accounts.map(account => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.netflix_email}
-                      </SelectItem>
-                    ))}
+                    {accounts
+                      .filter(account => {
+                        // When editing, always show the currently assigned account
+                        if (editingCustomer?.netflix_account_id === account.id) return true;
+                        // Only show accounts with available slots
+                        return (account.customer_count || 0) < MAX_SLOTS;
+                      })
+                      .map(account => {
+                        const slotsUsed = account.customer_count || 0;
+                        const slotsFree = MAX_SLOTS - slotsUsed;
+                        return (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.netflix_email} ({slotsFree} slot{slotsFree !== 1 ? 's' : ''} free)
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only accounts with available slots (max {MAX_SLOTS} per account) are shown
+                </p>
               </div>
 
               {/* Profile Number Selection (1-5) */}

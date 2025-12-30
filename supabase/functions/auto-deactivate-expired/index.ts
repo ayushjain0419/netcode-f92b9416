@@ -29,9 +29,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client with service role for admin operations
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Initialize Supabase client with external database credentials for admin operations
+    const supabaseUrl = Deno.env.get("EXT_SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("EXT_SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get current date

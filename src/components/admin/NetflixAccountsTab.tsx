@@ -23,7 +23,7 @@ interface NetflixAccount {
   customer_count?: number; // Number of customers assigned to this account
 }
 
-const MAX_SLOTS = 7; // Maximum customers per Netflix account
+const MAX_SLOTS = 6; // Maximum customers per Netflix account
 
 const NetflixAccountsTab = () => {
   const [accounts, setAccounts] = useState<NetflixAccount[]>([]);

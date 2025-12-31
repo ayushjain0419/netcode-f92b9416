@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, CreditCard, CheckCircle, AlertCircle, Calendar, RotateCw, Clock } from "lucide-react";
+import { Users, CreditCard, CheckCircle, AlertCircle, Calendar, RotateCw, Clock, Zap, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { differenceInDays, addDays, format } from "date-fns";
 
 interface Stats {
@@ -45,6 +47,51 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
   });
   const [rotationCustomers, setRotationCustomers] = useState<RotationCustomer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
+  const runDeactivation = async () => {
+    setIsDeactivating(true);
+    try {
+      // Get all active customers
+      const { data: customers, error: fetchError } = await supabase
+        .from("customers")
+        .select("id, name, purchase_date, subscription_days")
+        .eq("is_active", true);
+
+      if (fetchError) throw fetchError;
+
+      // Filter expired customers
+      const now = new Date();
+      const expiredCustomers = (customers || []).filter((customer) => {
+        const purchaseDate = new Date(customer.purchase_date);
+        const endDate = new Date(purchaseDate);
+        endDate.setDate(endDate.getDate() + customer.subscription_days);
+        return endDate <= now;
+      });
+
+      if (expiredCustomers.length === 0) {
+        toast.info("No expired subscriptions found");
+        return;
+      }
+
+      // Deactivate expired customers and free up their slots
+      const idsToDeactivate = expiredCustomers.map((c) => c.id);
+      const { error: updateError } = await supabase
+        .from("customers")
+        .update({ is_active: false, netflix_account_id: null, profile_number: null })
+        .in("id", idsToDeactivate);
+
+      if (updateError) throw updateError;
+
+      toast.success(`Deactivated ${expiredCustomers.length} expired subscription(s)`);
+      fetchStats(); // Refresh stats
+    } catch (error) {
+      console.error("Error running deactivation:", error);
+      toast.error("Failed to run deactivation");
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
 
   useEffect(() => {
     fetchStats();
@@ -292,10 +339,28 @@ const OverviewTab = ({ onDurationClick }: OverviewTabProps) => {
               </p>
             </div>
             <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-              <h3 className="font-medium text-foreground mb-1">Bulk Actions</h3>
-              <p className="text-sm text-muted-foreground">
-                Use "Customers" tab to bulk update accounts, extend subscriptions, or deactivate
+              <h3 className="font-medium text-foreground mb-1">Run Deactivation</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Manually deactivate all expired subscriptions and free up their slots
               </p>
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={runDeactivation}
+                disabled={isDeactivating}
+              >
+                {isDeactivating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Run Deactivation
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </CardContent>

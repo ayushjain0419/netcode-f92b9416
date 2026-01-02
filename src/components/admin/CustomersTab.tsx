@@ -31,7 +31,7 @@ interface NetflixAccount {
   customer_count?: number; // Number of customers assigned
 }
 
-const MAX_SLOTS = 7; // Maximum customers per Netflix account
+const MAX_SLOTS = 6; // Maximum customers per Netflix account
 
 interface Customer {
   id: string;
@@ -809,6 +809,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                     <TableHead>Netflix Account</TableHead>
                     <TableHead>Profile</TableHead>
                     <TableHead>Reseller</TableHead>
+                    <TableHead>Purchase Date</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Days Left</TableHead>
                     <TableHead>Status</TableHead>
@@ -869,6 +870,9 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {customer.purchased_from || "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(customer.purchase_date), "MMM d, yyyy")}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(endDate, "MMM d, yyyy")}

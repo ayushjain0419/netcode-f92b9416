@@ -102,6 +102,9 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
     purchased_from: "",
     custom_access_code: "" // Optional custom access code
   });
+  
+  // Override slot limit state
+  const [overrideSlotLimit, setOverrideSlotLimit] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -448,6 +451,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
       custom_access_code: ""
     });
     setEditingCustomer(null);
+    setOverrideSlotLimit(false);
   };
 
   const openEditDialog = (customer: Customer) => {
@@ -506,7 +510,7 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                 />
               </div>
               
-              {/* Netflix Account Selection - Only show accounts with free slots */}
+              {/* Netflix Account Selection - Only show accounts with free slots (unless override) */}
               <div className="space-y-2">
                 <Label htmlFor="netflix_account">Assign Netflix Account</Label>
                 <Select
@@ -522,23 +526,38 @@ const CustomersTab = ({ durationFilter, onClearDurationFilter }: CustomersTabPro
                       .filter(account => {
                         // When editing, always show the currently assigned account
                         if (editingCustomer?.netflix_account_id === account.id) return true;
+                        // Show all accounts if override is enabled
+                        if (overrideSlotLimit) return true;
                         // Only show accounts with available slots
                         return (account.customer_count || 0) < MAX_SLOTS;
                       })
                       .map(account => {
                         const slotsUsed = account.customer_count || 0;
                         const slotsFree = MAX_SLOTS - slotsUsed;
+                        const isFull = slotsFree <= 0;
                         return (
                           <SelectItem key={account.id} value={account.id}>
-                            {account.netflix_email} ({slotsFree} slot{slotsFree !== 1 ? 's' : ''} free)
+                            {account.netflix_email} {isFull ? "(FULL)" : `(${slotsFree} slot${slotsFree !== 1 ? 's' : ''} free)`}
                           </SelectItem>
                         );
                       })}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Only accounts with available slots (max {MAX_SLOTS} per account) are shown
-                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Checkbox
+                    id="override_slot_limit"
+                    checked={overrideSlotLimit}
+                    onCheckedChange={(checked) => setOverrideSlotLimit(checked === true)}
+                  />
+                  <Label htmlFor="override_slot_limit" className="text-xs text-muted-foreground cursor-pointer">
+                    Override slot limit (show all accounts)
+                  </Label>
+                </div>
+                {!overrideSlotLimit && (
+                  <p className="text-xs text-muted-foreground">
+                    Only accounts with available slots (max {MAX_SLOTS} per account) are shown
+                  </p>
+                )}
               </div>
 
               {/* Profile Number Selection (1-5) */}
